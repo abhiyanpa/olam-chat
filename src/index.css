@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Smooth scrolling behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for better touch interaction */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Touch-friendly tap highlight removal */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth touch interactions */
+.touch-action-pan-y {
+  touch-action: pan-y;
+}
+
+/* Message animations */
+@keyframes message-appear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-appear {
+  animation: message-appear 0.2s ease-out;
+}
+
+/* Prevent text selection during swipe */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Improved touch feedback */
+@media (hover: none) {
+  .touch-feedback:active {
+    opacity: 0.7;
+  }
+}
+
+/* Responsive font sizes */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 1025px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* Enhanced focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid theme('colors.primary.500');
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Message bubble animations */
+.message-bubble {
+  transition: transform 0.2s ease;
+}
+
+.message-bubble:active {
+  transform: scale(0.98);
+}
+
+/* Loading animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Enhanced mobile touch areas */
+@media (max-width: 640px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Prevent overscroll behavior */
+.overscroll-none {
+  overscroll-behavior: none;
+}
+
+/* Optimize scrolling performance */
+.will-change-transform {
+  will-change: transform;
+}
+
+/* Smooth scroll container */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent content shift during loading */
+.content-visibility-auto {
+  content-visibility: auto;
+}
