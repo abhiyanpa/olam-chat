@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, User, Mail, Camera, Loader2, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AlertModal } from './AlertModal';
+import { useNavigate } from 'react-router-dom';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, user }) => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState(user?.user_metadata?.username || '');
   const [loading, setLoading] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
@@ -47,8 +49,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    onClose();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      onClose();
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Error logging out:', error);
+      setAlertType('error');
+      setAlertMessage('Failed to logout. Please try again.');
+      setShowAlert(true);
+    }
   };
 
   if (!isOpen) return null;
@@ -132,7 +144,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
 
         <button
           onClick={handleLogout}
-          className="w-full mt-4 py-3 px-4 rounded-lg shadow-lg text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors flex items-center justify-center space-x-2"
+          className="w-full mt-4 py-3 px-4 rounded-lg shadow-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors flex items-center justify-center space-x-2"
         >
           <LogOut className="h-5 w-5" />
           <span>Logout</span>
