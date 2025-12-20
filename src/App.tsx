@@ -8,7 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 
 const AppContent = () => {
   const location = useLocation();
-  const showNavbar = location.pathname !== '/dashboard';
+  const showNavbar = location.pathname !== '/dashboard' && location.pathname !== '/';
 
   return (
     <div className="min-h-screen bg-gray-900">

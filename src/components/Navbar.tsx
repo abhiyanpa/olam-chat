@@ -36,7 +36,33 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center space-x-2">
-            <MessageSquare className="h-8 w-8 text-primary-400" />
+            <svg className="h-10 w-10" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="logo-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" style={{stopColor: '#FCAF45', stopOpacity: 1}} />
+                  <stop offset="25%" style={{stopColor: '#FD1D1D', stopOpacity: 1}} />
+                  <stop offset="50%" style={{stopColor: '#E1306C', stopOpacity: 1}} />
+                  <stop offset="75%" style={{stopColor: '#C13584', stopOpacity: 1}} />
+                  <stop offset="100%" style={{stopColor: '#833AB4', stopOpacity: 1}} />
+                </linearGradient>
+              </defs>
+              <rect x="20" y="20" width="160" height="160" rx="45" fill="url(#logo-grad)"/>
+              <g transform="translate(100, 100)">
+                <rect x="-40" y="-35" width="80" height="60" rx="15" 
+                  fill="none" 
+                  stroke="white" 
+                  strokeWidth="8"/>
+                <path d="M -15 25 L -15 40 L -30 25" 
+                  fill="none" 
+                  stroke="white" 
+                  strokeWidth="8" 
+                  strokeLinejoin="round" 
+                  strokeLinecap="round"/>
+                <circle cx="-20" cy="-5" r="5" fill="white"/>
+                <circle cx="0" cy="-5" r="5" fill="white"/>
+                <circle cx="20" cy="-5" r="5" fill="white"/>
+              </g>
+            </svg>
             <span className="text-xl font-bold">Olam Chat</span>
           </Link>
 
