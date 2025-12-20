@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
-import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX } from 'lucide-react';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
 import { soundManager } from '../lib/sounds';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface Profile {
   id: string;
@@ -105,11 +106,26 @@ export const Dashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [sending, setSending] = useState(false);
   const [soundMuted, setSoundMuted] = useState(() => soundManager.isSoundMuted());
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const { isMobile, isTablet } = useResponsive();
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth = true) => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  };
+
+  const handleScrollToBottom = () => {
+    scrollToBottom(true);
+    setUnreadMessagesCount(0);
   };
 
   const autoResizeTextarea = () => {
@@ -131,20 +147,56 @@ export const Dashboard = () => {
   }, [newMessage]);
 
   useEffect(() => {
-    scrollToBottom();
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+      if (isNearBottom) {
+        scrollToBottom();
+      }
+    }
   }, [messages]);
+
+  // Scroll detection for scroll-to-bottom button
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+      setShowScrollButton(!isNearBottom);
+      
+      if (isNearBottom) {
+        setUnreadMessagesCount(0);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-close sidebar on mobile when selecting user
+  useEffect(() => {
+    if (isMobile && selectedUser) {
+      setSidebarOpen(false);
+    }
+  }, [selectedUser, isMobile]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showSettings) {
-        setShowSettings(false);
+      if (e.key === 'Escape') {
+        if (showSettings) {
+          setShowSettings(false);
+        } else if (isMobile && !sidebarOpen && selectedUser) {
+          setSidebarOpen(true);
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showSettings]);
+  }, [showSettings, isMobile, sidebarOpen, selectedUser]);
 
   const formatTime = (timestamp: any) => {
     if (!timestamp) return '';
@@ -454,9 +506,27 @@ export const Dashboard = () => {
       </Helmet>
 
       {/* Sidebar */}
-      <div className="w-[280px] bg-[#fafafa] border-r border-gray-200 flex flex-col">
+      <div className={`bg-[#fafafa] border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${
+        isMobile 
+          ? `fixed inset-y-0 left-0 z-40 w-full transform ${
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }`
+          : isTablet
+          ? `w-[280px] ${
+              sidebarOpen ? 'block' : 'hidden'
+            }`
+          : 'w-[280px]'
+      }`}>
         {/* User Header */}
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="mr-2 text-gray-600 hover:text-gray-900"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
           <div className="flex items-center gap-3">
             <Avatar
               avatarUrl={user.photoURL || undefined}
@@ -589,10 +659,18 @@ export const Dashboard = () => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-white relative">
         {selectedUser ? (
           <>
-            <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between bg-white">
+            <div className="px-4 md:px-8 py-4 md:py-5 border-b border-gray-200 flex items-center justify-between bg-white">
+              {isMobile && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="mr-3 text-gray-600 hover:text-gray-900"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+              )}
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Avatar
@@ -633,7 +711,10 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafafa]">
+            <div 
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 bg-[#fafafa] relative"
+            >
               {messages.map((msg, index) => {
                 const isSent = msg.sender_id === user.uid;
                 const msgUser = isSent ? user : selectedUser;
@@ -684,9 +765,25 @@ export const Dashboard = () => {
                 );
               })}
               <div ref={messagesEndRef} />
+              
+              {/* Scroll to bottom button */}
+              {showScrollButton && (
+                <button
+                  onClick={handleScrollToBottom}
+                  className="fixed bottom-24 right-6 md:right-12 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 z-10"
+                  aria-label="Scroll to bottom"
+                >
+                  <ArrowDown className="w-5 h-5" />
+                  {unreadMessagesCount > 0 && (
+                    <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
 
-            <div className="px-8 py-5 border-t border-gray-200 bg-white">
+            <div className="px-4 md:px-8 py-4 md:py-5 border-t border-gray-200 bg-white">
               <form onSubmit={handleSendMessage} className="flex items-end gap-3">
                 <button type="button" className="text-gray-600 hover:text-gray-900 transition-colors mb-2">
                   <Paperclip className="w-5 h-5" />
@@ -728,6 +825,14 @@ export const Dashboard = () => {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white">
+            {(isMobile || isTablet) && !sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="absolute top-4 left-4 p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            )}
             <div className="text-center max-w-sm px-6">
               <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Mail className="w-12 h-12 text-blue-600" />

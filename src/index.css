@@ -16,6 +16,33 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Responsive touch targets - minimum 44px for mobile */
+@media (max-width: 768px) {
+  button, a, input, textarea {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+}
+
+/* Responsive font scaling */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 1025px) {
+  html {
+    font-size: 16px;
+  }
+}
+
 /* Custom scrollbar for better touch interaction */
 ::-webkit-scrollbar {
   width: 6px;
