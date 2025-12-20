@@ -121,6 +121,7 @@ export const Dashboard = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { isMobile, isTablet } = useResponsive();
 
   const scrollToBottom = (smooth = true) => {
@@ -129,6 +130,18 @@ export const Dashboard = () => {
         top: messagesContainerRef.current.scrollHeight,
         behavior: smooth ? 'smooth' : 'auto'
       });
+    }
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    const messageElement = messageRefs.current.get(messageId);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Highlight effect
+      messageElement.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+      setTimeout(() => {
+        messageElement.style.backgroundColor = '';
+      }, 1500);
     }
   };
 
@@ -396,8 +409,9 @@ export const Dashboard = () => {
       return;
     }
 
-    // Clear messages when switching conversations
+    // Clear messages and message refs when switching conversations
     setMessages([]);
+    messageRefs.current.clear();
 
     const messagesRef = collection(db, 'private_messages');
     const q1 = query(messagesRef, where('sender_id', '==', user.uid), where('receiver_id', '==', selectedUser.id), orderBy('created_at', 'asc'));
@@ -426,6 +440,9 @@ export const Dashboard = () => {
       }
       
       setMessages(allMessages);
+
+      // Auto-scroll to bottom on new messages
+      setTimeout(() => scrollToBottom(true), 100);
 
       const unreadMessages = snapshot.docs.filter(doc => !doc.data().read).slice(0, 5);
       if (unreadMessages.length > 0) {
@@ -526,6 +543,9 @@ export const Dashboard = () => {
       
       // Play sent sound
       soundManager.playSent();
+      
+      // Auto-scroll to bottom after sending
+      setTimeout(() => scrollToBottom(true), 100);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -802,7 +822,10 @@ export const Dashboard = () => {
                     <div className="flex flex-col max-w-[60%] relative">
                       {/* Reply preview */}
                       {msg.replyTo && (
-                        <div className={`mb-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs ${isSent ? 'ml-auto' : ''}`}>
+                        <div 
+                          onClick={() => scrollToMessage(msg.replyTo!.messageId)}
+                          className={`mb-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors ${isSent ? 'ml-auto' : ''}`}
+                        >
                           <div className="font-semibold text-gray-600 dark:text-gray-300 mb-1">
                             {msg.replyTo.senderName}
                           </div>
@@ -813,10 +836,14 @@ export const Dashboard = () => {
                       )}
                       
                       <div 
+                        ref={(el) => {
+                          if (el) messageRefs.current.set(msg.id, el);
+                          else messageRefs.current.delete(msg.id);
+                        }}
                         className={`relative bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words transition-all hover:shadow-md ${
                           isSent ? 'rounded-br-sm' : 'rounded-bl-sm'
                         }`}
-                        style={{ whiteSpace: 'pre-wrap' }}
+                        style={{ whiteSpace: 'pre-wrap', transition: 'background-color 0.3s ease' }}
                       >
                         {msg.content}
                         
