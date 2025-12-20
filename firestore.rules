@@ -10,21 +10,36 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
+    }
+    
     function validateString(value, minLen, maxLen) {
       return value is string && value.size() >= minLen && value.size() <= maxLen;
     }
     
-    // Profiles - users can read all, write their own with validation
+    // Profiles - users can read all, write their own with validation, admins can ban users
     match /profiles/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && 
                       validateString(request.resource.data.username, 3, 20) &&
                       validateString(request.resource.data.email, 3, 100) &&
                       request.resource.data.username.matches('^[a-zA-Z0-9_]+$');
-      allow update: if isOwner(userId) && 
+      allow update: if (isOwner(userId) && 
+                      // Allow username updates with validation
                       (!('username' in request.resource.data) || 
-                       validateString(request.resource.data.username, 3, 20)) &&
-                      (!('email' in request.resource.data));
+                       (validateString(request.resource.data.username, 3, 20) &&
+                        request.resource.data.username.matches('^[a-zA-Z0-9_]+$'))) &&
+                      // Email cannot be changed
+                      (!('email' in request.resource.data) || 
+                       request.resource.data.email == resource.data.email) &&
+                      // Users cannot change their own role or banned status
+                      (!('role' in request.resource.data)) &&
+                      (!('banned' in request.resource.data))) ||
+                      // Admins can update banned status and view-only fields
+                      (isAdmin() && 
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['banned', 'updated_at']));
       allow delete: if false; // Prevent profile deletion
     }
     
@@ -40,11 +55,12 @@ service cloud.firestore {
       allow update: if false; // Usernames are immutable
     }
     
-    // Private messages - only sender and receiver with validation
+    // Private messages - only sender and receiver with validation, admins can view all
     match /private_messages/{messageId} {
-      allow read: if isAuthenticated() && 
-                    (resource.data.sender_id == request.auth.uid || 
-                     resource.data.receiver_id == request.auth.uid);
+      allow read: if isAdmin() || 
+                    (isAuthenticated() && 
+                     (resource.data.sender_id == request.auth.uid || 
+                      resource.data.receiver_id == request.auth.uid));
       allow create: if isAuthenticated() && 
                       request.resource.data.sender_id == request.auth.uid &&
                       validateString(request.resource.data.content, 1, 4096) &&

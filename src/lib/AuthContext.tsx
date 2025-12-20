@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, onSnapshot } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +21,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
 
       if (user) {
+        // Check if user is banned
+        const profileDoc = await getDoc(doc(db, 'profiles', user.uid));
+        const profileData = profileDoc.data();
+        
+        if (profileData?.banned) {
+          alert('Your account has been banned. Please contact support.');
+          await signOut(auth);
+          setUser(null);
+          return;
+        }
+
+        // Listen for ban status changes in real-time
+        const unsubscribeProfile = onSnapshot(doc(db, 'profiles', user.uid), (snapshot) => {
+          const data = snapshot.data();
+          if (data?.banned) {
+            alert('Your account has been banned. You will be logged out.');
+            signOut(auth);
+            setUser(null);
+          }
+        });
+
         // Set user online
         await setDoc(doc(db, 'profiles', user.uid), {
           online: true,
@@ -49,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           clearInterval(heartbeat);
+          unsubscribeProfile();
         };
       }
     });

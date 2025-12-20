@@ -5,10 +5,11 @@ import { AuthProvider } from './lib/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
+import { Admin } from './pages/Admin';
 
 const AppContent = () => {
   const location = useLocation();
-  const showNavbar = location.pathname !== '/dashboard' && location.pathname !== '/';
+  const showNavbar = location.pathname !== '/dashboard' && location.pathname !== '/' && location.pathname !== '/admin';
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -16,6 +17,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>
