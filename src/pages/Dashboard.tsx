@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
 import { Search, Users, Settings, Send, Paperclip, Image, Smile, MessageSquare, Loader2, ChevronLeft, ChevronRight, Check, CheckCheck } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, limit, onSnapshot, addDoc, getDocs, or, and, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
 
@@ -89,15 +89,13 @@ export const Dashboard = () => {
     const q1 = query(
       messagesRef,
       where('sender_id', '==', user.uid),
-      orderBy('created_at', 'desc'),
-      limit(50)
+      orderBy('created_at', 'desc')
     );
     
     const q2 = query(
       messagesRef,
       where('receiver_id', '==', user.uid),
-      orderBy('created_at', 'desc'),
-      limit(50)
+      orderBy('created_at', 'desc')
     );
 
     const unsubscribe1 = onSnapshot(q1, async (snapshot) => {
@@ -117,6 +115,9 @@ export const Dashboard = () => {
       });
     });
 
+    // Initial fetch
+    updateConversations();
+
     return () => {
       unsubscribe1();
       unsubscribe2();
@@ -128,24 +129,34 @@ export const Dashboard = () => {
 
     try {
       const messagesRef = collection(db, 'private_messages');
-      const q = query(
+      
+      // Query for sent messages
+      const q1 = query(
         messagesRef,
-        or(
-          where('sender_id', '==', user.uid),
-          where('receiver_id', '==', user.uid)
-        ),
-        orderBy('created_at', 'desc'),
-        limit(100)
+        where('sender_id', '==', user.uid),
+        orderBy('created_at', 'desc')
+      );
+      
+      // Query for received messages
+      const q2 = query(
+        messagesRef,
+        where('receiver_id', '==', user.uid),
+        orderBy('created_at', 'desc')
       );
 
-      const snapshot = await getDocs(q);
+      const [sentSnapshot, receivedSnapshot] = await Promise.all([
+        getDocs(q1),
+        getDocs(q2)
+      ]);
+
       const userIds = new Set<string>();
       const lastMessages = new Map<string, any>();
       const unreadCounts = new Map<string, number>();
 
-      snapshot.docs.forEach(doc => {
+      // Process sent messages
+      sentSnapshot.docs.forEach(doc => {
         const msg = doc.data();
-        const otherUserId = msg.sender_id === user.uid ? msg.receiver_id : msg.sender_id;
+        const otherUserId = msg.receiver_id;
         
         userIds.add(otherUserId);
         
@@ -155,8 +166,27 @@ export const Dashboard = () => {
             time: msg.created_at
           });
         }
+      });
 
-        if (msg.receiver_id === user.uid && !msg.read) {
+      // Process received messages
+      receivedSnapshot.docs.forEach(doc => {
+        const msg = doc.data();
+        const otherUserId = msg.sender_id;
+        
+        userIds.add(otherUserId);
+        
+        const existingTime = lastMessages.get(otherUserId)?.time;
+        const currentTime = msg.created_at;
+        
+        // Update if this is more recent or doesn't exist
+        if (!existingTime || (currentTime?.toMillis && existingTime?.toMillis && currentTime.toMillis() > existingTime.toMillis())) {
+          lastMessages.set(otherUserId, {
+            content: msg.content,
+            time: msg.created_at
+          });
+        }
+
+        if (!msg.read) {
           unreadCounts.set(otherUserId, (unreadCounts.get(otherUserId) || 0) + 1);
         }
       });
@@ -190,6 +220,8 @@ export const Dashboard = () => {
         });
 
         setConversations(convos);
+      } else {
+        setConversations([]);
       }
     } catch (error) {
       console.error('Error updating conversations:', error);
@@ -246,64 +278,93 @@ export const Dashboard = () => {
 
     const fetchMessages = async () => {
       const messagesRef = collection(db, 'private_messages');
-      const q = query(
+      
+      // Query for messages sent by current user to selected user
+      const q1 = query(
         messagesRef,
-        or(
-          and(
-            where('sender_id', '==', user.uid),
-            where('receiver_id', '==', selectedUser.id)
-          ),
-          and(
-            where('sender_id', '==', selectedUser.id),
-            where('receiver_id', '==', user.uid)
-          )
-        ),
+        where('sender_id', '==', user.uid),
+        where('receiver_id', '==', selectedUser.id),
+        orderBy('created_at', 'asc')
+      );
+      
+      // Query for messages sent by selected user to current user
+      const q2 = query(
+        messagesRef,
+        where('sender_id', '==', selectedUser.id),
+        where('receiver_id', '==', user.uid),
         orderBy('created_at', 'asc')
       );
 
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const messagesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          status: 'delivered'
-        })) as Message[];
-        
-        setMessages(messagesData);
-        
-        // Mark messages as read
-        const batch: any[] = [];
-        snapshot.docs.forEach(doc => {
-          const msg = doc.data();
-          if (msg.receiver_id === user.uid && !msg.read) {
-            batch.push({ ref: doc.ref, read: true });
-          }
-        });
-
-        // Update read status (batched for free tier efficiency)
-        if (batch.length > 0 && batch.length <= 5) {
-          const { doc: docRef, updateDoc } = await import('firebase/firestore');
-          for (const item of batch) {
-            await updateDoc(item.ref, { read: true }).catch(() => {});
-          }
-          await updateConversations();
-        }
-        
-        // Play sound for new messages from others
-        snapshot.docChanges().forEach(change => {
-          if (change.type === 'added') {
-            const msg = change.doc.data();
-            if (msg.sender_id === selectedUser.id) {
-              messageSound.play().catch(() => {});
-            }
-          }
-        });
-        
-        scrollToBottom();
-      }, (error) => {
-        console.error('Error fetching messages:', error);
+      const unsubscribe1 = onSnapshot(q1, () => {
+        updateMessages();
       });
 
-      return unsubscribe;
+      const unsubscribe2 = onSnapshot(q2, (snapshot) => {
+        updateMessages();
+        // Play sound for new incoming messages
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            messageSound.play().catch(() => {});
+          }
+        });
+      });
+
+      const updateMessages = async () => {
+        try {
+          const [snapshot1, snapshot2] = await Promise.all([
+            getDocs(q1),
+            getDocs(q2)
+          ]);
+
+          const allMessages: Message[] = [];
+          
+          snapshot1.docs.forEach(doc => {
+            allMessages.push({
+              id: doc.id,
+              ...doc.data(),
+              status: 'delivered'
+            } as Message);
+          });
+
+          snapshot2.docs.forEach(doc => {
+            allMessages.push({
+              id: doc.id,
+              ...doc.data(),
+              status: 'delivered'
+            } as Message);
+          });
+
+          // Sort by timestamp
+          allMessages.sort((a, b) => {
+            const timeA = a.created_at?.toMillis ? a.created_at.toMillis() : 0;
+            const timeB = b.created_at?.toMillis ? b.created_at.toMillis() : 0;
+            return timeA - timeB;
+          });
+
+          setMessages(allMessages);
+
+          // Mark received messages as read (limited batching for free tier)
+          const unreadMessages = snapshot2.docs.filter(doc => !doc.data().read).slice(0, 5);
+          if (unreadMessages.length > 0) {
+            const { updateDoc } = await import('firebase/firestore');
+            for (const msgDoc of unreadMessages) {
+              await updateDoc(msgDoc.ref, { read: true }).catch(() => {});
+            }
+            await updateConversations();
+          }
+
+          scrollToBottom();
+        } catch (error) {
+          console.error('Error updating messages:', error);
+        }
+      };
+
+      await updateMessages();
+
+      return () => {
+        unsubscribe1();
+        unsubscribe2();
+      };
     };
 
     const unsubscribePromise = fetchMessages();
