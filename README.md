@@ -4,7 +4,7 @@ A modern real-time chat application built with React, TypeScript, and Firebase.
 
 ## Live Demo
 
-🌐 **Live App:** [https://olam-chat.web.app](https://olam.abhiyanpa.in/)
+🌐 **Live App:** [https://olam.abhiyanpa.in/](https://olam.abhiyanpa.in/)
 
 <img width="956" alt="{16F3E133-282F-4C85-84D8-A17587307B77}" src="https://github.com/user-attachments/assets/861b493b-2db8-47f0-ab61-15e5f2fa2c8a" />
 
