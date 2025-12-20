@@ -9,6 +9,7 @@ import { SettingsModal } from '../components/SettingsModal';
 import { soundManager } from '../lib/sounds';
 import { useResponsive } from '../hooks/useResponsive';
 import { typingManager } from '../lib/typing';
+import { validateMessage, messageSendLimiter } from '../lib/security';
 
 interface Profile {
   id: string;
@@ -502,9 +503,21 @@ export const Dashboard = () => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedUser || sending) return;
 
-    // Check character limit
-    if (newMessage.trim().length > MAX_MESSAGE_LENGTH) {
-      setErrorMessage(`Message is too long! Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`);
+    // Validate message content
+    const validation = validateMessage(newMessage.trim());
+    if (!validation.valid) {
+      setErrorMessage(validation.error || 'Invalid message');
+      setIsShaking(true);
+      setTimeout(() => {
+        setIsShaking(false);
+        setErrorMessage('');
+      }, 3000);
+      return;
+    }
+
+    // Rate limiting - max 10 messages per 10 seconds
+    if (!messageSendLimiter.isAllowed(`send_${user!.uid}`, 10, 10000)) {
+      setErrorMessage('You are sending messages too quickly. Please slow down.');
       setIsShaking(true);
       setTimeout(() => {
         setIsShaking(false);

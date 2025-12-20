@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { validateUsername, validateEmail } from '../lib/security';
 
 type FormType = 'login' | 'register' | 'reset';
 
@@ -135,9 +136,17 @@ export const Home = () => {
     }
 
     // Validate username format
-    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-    if (!usernameRegex.test(regUsername)) {
-      setError('Username must be 3-20 characters and contain only letters, numbers, and underscores');
+    const usernameValidation = validateUsername(regUsername);
+    if (!usernameValidation.valid) {
+      setError(usernameValidation.error || 'Invalid username');
+      setLoading(false);
+      return;
+    }
+
+    // Validate email format
+    const emailValidation = validateEmail(regEmail);
+    if (!emailValidation.valid) {
+      setError(emailValidation.error || 'Invalid email');
       setLoading(false);
       return;
     }

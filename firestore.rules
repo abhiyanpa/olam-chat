@@ -1,44 +1,70 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Profiles - users can read all, write their own
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function validateString(value, minLen, maxLen) {
+      return value is string && value.size() >= minLen && value.size() <= maxLen;
+    }
+    
+    // Profiles - users can read all, write their own with validation
     match /profiles/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && 
+                      validateString(request.resource.data.username, 3, 20) &&
+                      validateString(request.resource.data.email, 3, 100) &&
+                      request.resource.data.username.matches('^[a-zA-Z0-9_]+$');
+      allow update: if isOwner(userId) && 
+                      (!('username' in request.resource.data) || 
+                       validateString(request.resource.data.username, 3, 20)) &&
+                      (!('email' in request.resource.data));
+      allow delete: if false; // Prevent profile deletion
     }
     
-    // Usernames - for uniqueness checks
+    // Usernames - for uniqueness checks with validation
     match /usernames/{username} {
-      allow read: if true;
-      allow create: if request.auth != null && 
-                      request.resource.data.uid == request.auth.uid;
-      allow delete: if request.auth != null && 
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                      request.resource.data.uid == request.auth.uid &&
+                      username.size() >= 3 && username.size() <= 20 &&
+                      username.matches('^[a-z0-9_]+$');
+      allow delete: if isAuthenticated() && 
                       resource.data.uid == request.auth.uid;
+      allow update: if false; // Usernames are immutable
     }
     
-    // Public messages - authenticated users can read/create
-    match /messages/{messageId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && 
-                      request.resource.data.user_id == request.auth.uid;
-    }
-    
-    // Private messages - only sender and receiver
+    // Private messages - only sender and receiver with validation
     match /private_messages/{messageId} {
-      allow read: if request.auth != null && 
+      allow read: if isAuthenticated() && 
                     (resource.data.sender_id == request.auth.uid || 
                      resource.data.receiver_id == request.auth.uid);
-      allow create: if request.auth != null && 
-                      request.resource.data.sender_id == request.auth.uid;
-      allow update: if request.auth != null && 
+      allow create: if isAuthenticated() && 
+                      request.resource.data.sender_id == request.auth.uid &&
+                      validateString(request.resource.data.content, 1, 4096) &&
+                      request.resource.data.receiver_id is string &&
+                      request.resource.data.receiver_id != request.auth.uid;
+      allow update: if isAuthenticated() && 
                      (resource.data.sender_id == request.auth.uid ||
-                      resource.data.receiver_id == request.auth.uid);
+                      resource.data.receiver_id == request.auth.uid) &&
+                     // Only allow updating read status
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if false; // Prevent message deletion
     }
     
-    // Typing status - users can read their chat's status, write their own
+    // Typing status - with proper validation
     match /typing_status/{statusId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                     request.resource.data.userId == request.auth.uid &&
+                     request.resource.data.isTyping is bool;
+      allow delete: if isAuthenticated();
     }
   }
 }
