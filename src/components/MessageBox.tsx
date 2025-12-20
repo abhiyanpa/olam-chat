@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Loader2, Bell, MoreVertical, Check, CheckCheck } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { Send, Loader2, Bell, MoreVertical, Check, CheckCheck, Paperclip, Image as ImageIcon, X } from 'lucide-react';
+import { db, storage } from '../lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot, addDoc, Timestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { AlertModal } from './AlertModal';
 
 interface Message {
@@ -11,6 +12,12 @@ interface Message {
   username: string;
   created_at: string;
   status?: 'sending' | 'sent' | 'delivered';
+  attachment?: {
+    url: string;
+    type: 'image' | 'file';
+    name: string;
+    size: number;
+  };
 }
 
 interface MessageBoxProps {
@@ -27,10 +34,14 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
@@ -93,36 +104,96 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
     setShowAlert(true);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      showError('File must be less than 5MB');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const clearFileSelection = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<{ url: string; type: 'image' | 'file' }> => {
+    const storageRef = ref(storage, `messages/${user.uid}/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    return {
+      url: downloadURL,
+      type: file.type.startsWith('image/') ? 'image' : 'file'
+    };
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || loading) return;
+    if ((!newMessage.trim() && !selectedFile) || loading) return;
+
+    setLoading(true);
+    setUploading(true);
 
     const tempId = crypto.randomUUID();
-    const tempMessage: Message = {
-      id: tempId,
-      content: newMessage.trim(),
-      user_id: user.uid,
-      username: user.displayName || user.email || 'Anonymous',
-      created_at: new Date().toISOString(),
-      status: 'sending'
-    };
-
-    setMessages(prev => [...prev, tempMessage]);
-    setNewMessage('');
-    scrollToBottom();
-    setLoading(true);
+    let attachment;
 
     try {
-      const startTime = Date.now();
+      // Upload file if selected
+      if (selectedFile) {
+        const uploadResult = await uploadFile(selectedFile);
+        attachment = {
+          url: uploadResult.url,
+          type: uploadResult.type,
+          name: selectedFile.name,
+          size: selectedFile.size
+        };
+      }
+
+      const tempMessage: Message = {
+        id: tempId,
+        content: newMessage.trim() || (attachment ? `Sent a ${attachment.type}` : ''),
+        user_id: user.uid,
+        username: user.displayName || user.email || 'Anonymous',
+        created_at: new Date().toISOString(),
+        status: 'sending',
+        attachment
+      };
+
+      setMessages(prev => [...prev, tempMessage]);
+      setNewMessage('');
+      clearFileSelection();
+      scrollToBottom();
+
       const messagesRef = collection(db, 'messages');
       const docRef = await addDoc(messagesRef, {
         content: tempMessage.content,
         user_id: user.uid,
         username: user.displayName || user.email || 'Anonymous',
-        created_at: Timestamp.now()
+        created_at: Timestamp.now(),
+        ...(attachment && { attachment })
       });
 
-      const elapsedTime = Date.now() - startTime;
+      const elapsedTime = Date.now() - Date.now();
       const remainingDelay = Math.max(0, 500 - elapsedTime);
 
       await new Promise(resolve => setTimeout(resolve, remainingDelay));
@@ -141,6 +212,7 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
       showError(error.message);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -227,6 +299,31 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </div>
+              {message.attachment && (
+                <div className="mt-2">
+                  {message.attachment.type === 'image' ? (
+                    <img
+                      src={message.attachment.url}
+                      alt={message.attachment.name}
+                      className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(message.attachment!.url, '_blank')}
+                    />
+                  ) : (
+                    <a
+                      href={message.attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2 bg-gray-600 bg-opacity-50 rounded hover:bg-opacity-75 transition-all"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{message.attachment.name}</p>
+                        <p className="text-xs text-gray-300">{(message.attachment.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    </a>
+                  )}
+                </div>
+              )}
               <p className="break-words text-sm md:text-base">{message.content}</p>
               <div className="flex items-center justify-end gap-1 mt-1">
                 <span className="text-[10px] md:text-xs text-gray-300">
@@ -245,7 +342,57 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
       </div>
 
       <form onSubmit={handleSendMessage} className="sticky bottom-0 p-2 md:p-4 border-t border-gray-700 bg-gray-800">
+        {selectedFile && (
+          <div className="mb-2 p-2 bg-gray-700 rounded-lg flex items-center gap-2">
+            {filePreview ? (
+              <img src={filePreview} alt="Preview" className="h-16 w-16 object-cover rounded" />
+            ) : (
+              <div className="h-16 w-16 bg-gray-600 rounded flex items-center justify-center">
+                <Paperclip className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-white truncate">{selectedFile.name}</p>
+              <p className="text-xs text-gray-400">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+            </div>
+            <button
+              type="button"
+              onClick={clearFileSelection}
+              className="p-1 hover:bg-gray-600 rounded transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center space-x-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading || uploading}
+            className="min-w-[44px] min-h-[44px] p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (fileInputRef.current) {
+                fileInputRef.current.accept = 'image/*';
+                fileInputRef.current.click();
+              }
+            }}
+            disabled={loading || uploading}
+            className="min-w-[44px] min-h-[44px] p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            <ImageIcon className="h-5 w-5" />
+          </button>
           <input
             ref={inputRef}
             type="text"
@@ -257,10 +404,10 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
           />
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploading}
             className="min-w-[44px] min-h-[44px] p-2 bg-primary-600 hover:bg-primary-700 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transform hover:scale-105"
           >
-            {loading ? (
+            {loading || uploading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <Send className="h-5 w-5" />
