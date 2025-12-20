@@ -39,6 +39,16 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
     }
   }, [messages.length]);
 
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleTimeString();
+    } catch {
+      return '';
+    }
+  };
+
   useEffect(() => {
     const messagesRef = collection(db, 'messages');
     const q = query(
@@ -220,7 +230,7 @@ export const MessageBox: React.FC<MessageBoxProps> = ({ user }) => {
               <p className="break-words text-sm md:text-base">{message.content}</p>
               <div className="flex items-center justify-end gap-1 mt-1">
                 <span className="text-[10px] md:text-xs text-gray-300">
-                  {new Date(message.created_at).toLocaleTimeString()}
+                  {formatTime(message.created_at)}
                 </span>
                 {message.user_id === user.uid && (
                   <span className="text-gray-300">

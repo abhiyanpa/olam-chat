@@ -12,7 +12,7 @@ interface Profile {
   username: string;
   avatar_url?: string;
   online: boolean;
-  last_seen: string;
+  last_seen: any;
 }
 
 interface Message {
@@ -20,13 +20,24 @@ interface Message {
   content: string;
   sender_id: string;
   receiver_id: string;
-  created_at: string;
+  created_at: any;
+  read?: boolean;
   status?: 'sending' | 'sent' | 'delivered';
+}
+
+interface Conversation {
+  userId: string;
+  username: string;
+  lastMessage: string;
+  lastMessageTime: any;
+  unreadCount: number;
+  online: boolean;
 }
 
 export const Dashboard = () => {
   const { user, loading } = useAuth();
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -49,50 +60,186 @@ export const Dashboard = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Helper function to format timestamps safely
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleTimeString();
+    } catch {
+      return '';
+    }
+  };
+
+  const formatLastSeen = (timestamp: any) => {
+    if (!timestamp) return 'Offline';
+    try {
+      const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+      return 'Last seen ' + date.toLocaleString();
+    } catch {
+      return 'Offline';
+    }
+  };
+
+  // Fetch conversations (users you've messaged with)
   useEffect(() => {
-    const fetchUsers = async () => {
+    if (!user) return;
+
+    const messagesRef = collection(db, 'private_messages');
+    const q1 = query(
+      messagesRef,
+      where('sender_id', '==', user.uid),
+      orderBy('created_at', 'desc'),
+      limit(50)
+    );
+    
+    const q2 = query(
+      messagesRef,
+      where('receiver_id', '==', user.uid),
+      orderBy('created_at', 'desc'),
+      limit(50)
+    );
+
+    const unsubscribe1 = onSnapshot(q1, async (snapshot) => {
+      await updateConversations();
+    });
+
+    const unsubscribe2 = onSnapshot(q2, async (snapshot) => {
+      await updateConversations();
+      // Mark messages as read when received
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const msg = change.doc.data();
+          if (msg.sender_id !== user.uid && !msg.read) {
+            messageSound.play().catch(() => {});
+          }
+        }
+      });
+    });
+
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+    };
+  }, [user]);
+
+  const updateConversations = async () => {
+    if (!user) return;
+
+    try {
+      const messagesRef = collection(db, 'private_messages');
+      const q = query(
+        messagesRef,
+        or(
+          where('sender_id', '==', user.uid),
+          where('receiver_id', '==', user.uid)
+        ),
+        orderBy('created_at', 'desc'),
+        limit(100)
+      );
+
+      const snapshot = await getDocs(q);
+      const userIds = new Set<string>();
+      const lastMessages = new Map<string, any>();
+      const unreadCounts = new Map<string, number>();
+
+      snapshot.docs.forEach(doc => {
+        const msg = doc.data();
+        const otherUserId = msg.sender_id === user.uid ? msg.receiver_id : msg.sender_id;
+        
+        userIds.add(otherUserId);
+        
+        if (!lastMessages.has(otherUserId)) {
+          lastMessages.set(otherUserId, {
+            content: msg.content,
+            time: msg.created_at
+          });
+        }
+
+        if (msg.receiver_id === user.uid && !msg.read) {
+          unreadCounts.set(otherUserId, (unreadCounts.get(otherUserId) || 0) + 1);
+        }
+      });
+
+      // Fetch user profiles for conversations
+      if (userIds.size > 0) {
+        const profilesRef = collection(db, 'profiles');
+        const profilesSnapshot = await getDocs(profilesRef);
+        
+        const convos: Conversation[] = [];
+        profilesSnapshot.docs.forEach(doc => {
+          const profile = doc.data();
+          if (userIds.has(doc.id)) {
+            const lastMsg = lastMessages.get(doc.id);
+            convos.push({
+              userId: doc.id,
+              username: profile.username || 'Unknown',
+              lastMessage: lastMsg?.content || '',
+              lastMessageTime: lastMsg?.time,
+              unreadCount: unreadCounts.get(doc.id) || 0,
+              online: profile.online || false
+            });
+          }
+        });
+
+        // Sort by last message time
+        convos.sort((a, b) => {
+          const timeA = a.lastMessageTime?.toMillis ? a.lastMessageTime.toMillis() : 0;
+          const timeB = b.lastMessageTime?.toMillis ? b.lastMessageTime.toMillis() : 0;
+          return timeB - timeA;
+        });
+
+        setConversations(convos);
+      }
+    } catch (error) {
+      console.error('Error updating conversations:', error);
+    }
+  };
+
+  // Search for new users
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (!searchQuery.trim() || !user) {
+        setSearchResults([]);
+        return;
+      }
+
       setIsSearching(true);
       try {
         const profilesRef = collection(db, 'profiles');
-        const q = query(profilesRef, orderBy('username'));
+        const snapshot = await getDocs(profilesRef);
         
-        const querySnapshot = await getDocs(q);
-        let usersData = querySnapshot.docs
+        const results = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as Profile))
-          .filter(profile => profile.id !== user?.uid);
-
-        if (searchQuery) {
-          usersData = usersData.filter(profile => 
+          .filter(profile => 
+            profile.id !== user.uid &&
             profile.username.toLowerCase().includes(searchQuery.toLowerCase())
           );
-        }
 
-        setUsers(usersData);
+        setSearchResults(results);
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Error searching users:', error);
       } finally {
         setIsSearching(false);
       }
     };
 
-    if (user) {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-
-      const timeout = setTimeout(() => {
-        fetchUsers();
-      }, 300);
-
-      setSearchTimeout(timeout);
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
     }
+
+    const timeout = setTimeout(() => {
+      searchUsers();
+    }, 300);
+
+    setSearchTimeout(timeout);
 
     return () => {
       if (searchTimeout) {
         clearTimeout(searchTimeout);
       }
     };
-  }, [user, searchQuery]);
+  }, [searchQuery, user]);
 
   useEffect(() => {
     if (!selectedUser || !user) return;
@@ -114,7 +261,7 @@ export const Dashboard = () => {
         orderBy('created_at', 'asc')
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
         const messagesData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
@@ -122,6 +269,24 @@ export const Dashboard = () => {
         })) as Message[];
         
         setMessages(messagesData);
+        
+        // Mark messages as read
+        const batch: any[] = [];
+        snapshot.docs.forEach(doc => {
+          const msg = doc.data();
+          if (msg.receiver_id === user.uid && !msg.read) {
+            batch.push({ ref: doc.ref, read: true });
+          }
+        });
+
+        // Update read status (batched for free tier efficiency)
+        if (batch.length > 0 && batch.length <= 5) {
+          const { doc: docRef, updateDoc } = await import('firebase/firestore');
+          for (const item of batch) {
+            await updateDoc(item.ref, { read: true }).catch(() => {});
+          }
+          await updateConversations();
+        }
         
         // Play sound for new messages from others
         snapshot.docChanges().forEach(change => {
@@ -159,6 +324,7 @@ export const Dashboard = () => {
       sender_id: user.uid,
       receiver_id: selectedUser.id,
       created_at: new Date().toISOString(),
+      read: false,
       status: 'sending'
     };
 
@@ -173,7 +339,8 @@ export const Dashboard = () => {
         content: tempMessage.content,
         sender_id: user.uid,
         receiver_id: selectedUser.id,
-        created_at: Timestamp.now()
+        created_at: Timestamp.now(),
+        read: false
       });
 
       const elapsedTime = Date.now() - startTime;
@@ -190,6 +357,9 @@ export const Dashboard = () => {
           } : msg
         )
       );
+
+      // Update conversations
+      await updateConversations();
     } catch (error) {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       console.error('Error sending message:', error);
@@ -292,42 +462,101 @@ export const Dashboard = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              {users.length === 0 ? (
-                <div className="text-center p-4 text-gray-400">
-                  {searchQuery ? 'No users found' : 'No users available'}
-                </div>
-              ) : (
-                users.map((profile) => (
-                  <button
-                    key={profile.id}
-                    onClick={() => {
-                      setSelectedUser(profile);
-                      if (window.innerWidth < 768) {
-                        setIsSidebarCollapsed(true);
-                      }
-                    }}
-                    className={`w-full min-h-[64px] p-4 flex items-center space-x-3 hover:bg-gray-700 transition-colors ${
-                      selectedUser?.id === profile.id ? 'bg-gray-700' : ''
-                    }`}
-                  >
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center">
-                        {profile.username[0].toUpperCase()}
+              {searchQuery ? (
+                // Show search results when searching
+                searchResults.length === 0 ? (
+                  <div className="text-center p-4 text-gray-400">
+                    {isSearching ? 'Searching...' : 'No users found'}
+                  </div>
+                ) : (
+                  searchResults.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={async () => {
+                        setSelectedUser(profile);
+                        setSearchQuery('');
+                        if (window.innerWidth < 768) {
+                          setIsSidebarCollapsed(true);
+                        }
+                      }}
+                      className={`w-full min-h-[64px] p-4 flex items-center space-x-3 hover:bg-gray-700 transition-colors ${
+                        selectedUser?.id === profile.id ? 'bg-gray-700' : ''
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center">
+                          {profile.username[0].toUpperCase()}
+                        </div>
+                        {profile.online && (
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                        )}
                       </div>
-                      {profile.online && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                      {!isSidebarCollapsed && (
+                        <div className="flex-1 text-left">
+                          <h3 className="font-medium truncate">{profile.username}</h3>
+                          <p className="text-sm text-gray-400">
+                            {profile.online ? 'Online' : 'Offline'}
+                          </p>
+                        </div>
                       )}
-                    </div>
-                    {!isSidebarCollapsed && (
-                      <div className="flex-1 text-left">
-                        <h3 className="font-medium truncate">{profile.username}</h3>
-                        <p className="text-sm text-gray-400">
-                          {profile.online ? 'Online' : 'Offline'}
-                        </p>
+                    </button>
+                  ))
+                )
+              ) : (
+                // Show conversations when not searching
+                conversations.length === 0 ? (
+                  <div className="text-center p-4 text-gray-400">
+                    <p>No conversations yet</p>
+                    <p className="text-xs mt-2">Search for users to start chatting</p>
+                  </div>
+                ) : (
+                  conversations.map((convo) => (
+                    <button
+                      key={convo.userId}
+                      onClick={async () => {
+                        // Fetch user profile
+                        const { doc: docRef, getDoc } = await import('firebase/firestore');
+                        const profileDoc = await getDoc(docRef(db, 'profiles', convo.userId));
+                        if (profileDoc.exists()) {
+                          setSelectedUser({
+                            id: convo.userId,
+                            ...profileDoc.data()
+                          } as Profile);
+                        }
+                        if (window.innerWidth < 768) {
+                          setIsSidebarCollapsed(true);
+                        }
+                      }}
+                      className={`w-full min-h-[64px] p-4 flex items-center space-x-3 hover:bg-gray-700 transition-colors ${
+                        selectedUser?.id === convo.userId ? 'bg-gray-700' : ''
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center">
+                          {convo.username[0].toUpperCase()}
+                        </div>
+                        {convo.online && (
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                        )}
                       </div>
-                    )}
-                  </button>
-                ))
+                      {!isSidebarCollapsed && (
+                        <div className="flex-1 text-left min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium truncate">{convo.username}</h3>
+                            {convo.unreadCount > 0 && (
+                              <span className="ml-2 px-2 py-0.5 text-xs bg-primary-600 rounded-full">
+                                {convo.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-400 truncate">
+                            {convo.lastMessage}
+                          </p>
+                        </div>
+                      )}
+                    </button>
+                  ))
+                )
               )}
             </div>
 
@@ -363,7 +592,7 @@ export const Dashboard = () => {
                     <div>
                       <h2 className="font-medium">{selectedUser.username}</h2>
                       <p className="text-sm text-gray-400">
-                        {selectedUser.online ? 'Online' : 'Last seen ' + new Date(selectedUser.last_seen).toLocaleString()}
+                        {selectedUser.online ? 'Online' : formatLastSeen(selectedUser.last_seen)}
                       </p>
                     </div>
                   </div>
@@ -394,7 +623,7 @@ export const Dashboard = () => {
                         <p className="break-words text-sm md:text-base">{message.content}</p>
                         <div className="flex items-center justify-end gap-1 mt-1">
                           <span className="text-[10px] md:text-xs text-gray-300">
-                            {new Date(message.created_at).toLocaleTimeString()}
+                            {formatTime(message.created_at)}
                           </span>
                           {message.sender_id === user.uid && (
                             <span className="text-gray-300">
