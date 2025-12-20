@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
-import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2 } from 'lucide-react';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
@@ -284,30 +284,69 @@ export const Dashboard = () => {
   if (!user) return <Navigate to="/" replace />;
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden max-w-[1400px] mx-auto">
+    <div className="h-screen w-screen bg-white flex overflow-hidden fixed inset-0">
       <Helmet>
         <title>Messages - Olam Chat</title>
       </Helmet>
 
       {/* Sidebar */}
       <div className="w-[280px] bg-[#fafafa] border-r border-gray-200 flex flex-col">
-        <div className="p-5 border-b border-gray-200">
+        {/* User Header */}
+        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full flex-shrink-0"
+              style={user.photoURL ? {
+                backgroundImage: `url(${user.photoURL})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              } : {
+                background: getGradientForUser(user.uid)
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-sm text-black truncate">{user.displayName}</div>
+              <div className="text-xs text-green-600 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-600 rounded-full" />
+                Online
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="p-4 border-b border-gray-200">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-300"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-300 focus:ring-1 focus:ring-gray-300"
             />
           </div>
         </div>
 
-        <div className="px-5 py-5 text-lg font-semibold text-black">Messages</div>
+        <div className="px-5 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wide">
+          {searchQuery ? 'Search Results' : 'Messages'}
+        </div>
 
         <div className="flex-1 overflow-y-auto">
-          {searchResults.length > 0 ? (
+          {searchQuery && searchResults.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <Search className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No users found</p>
+              <p className="text-xs text-gray-400 mt-1">Try a different search term</p>
+            </div>
+          ) : searchResults.length > 0 ? (
             searchResults.map((profile) => (
               <button
                 key={profile.id}
@@ -316,25 +355,37 @@ export const Dashboard = () => {
                   setSearchQuery('');
                   setSearchResults([]);
                 }}
-                className="w-full px-5 py-4 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                className="w-full px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
               >
                 <div
                   className="w-10 h-10 rounded-full flex-shrink-0"
-                  style={{ background: getGradientForUser(profile.id) }}
+                  style={profile.avatar_url ? {
+                    backgroundImage: `url(${profile.avatar_url})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  } : {
+                    background: getGradientForUser(profile.id)
+                  }}
                 />
                 <div className="flex-1 text-left min-w-0">
-                  <div className="font-semibold text-sm text-black mb-1">{profile.username}</div>
-                  <div className="text-xs text-gray-500">Start conversation</div>
+                  <div className="font-semibold text-sm text-black mb-0.5">{profile.username}</div>
+                  <div className="text-xs text-gray-500">Click to start conversation</div>
                 </div>
               </button>
             ))
+          ) : conversations.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <Mail className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No conversations yet</p>
+              <p className="text-xs text-gray-400 mt-1">Search for users to start chatting</p>
+            </div>
           ) : (
             conversations.map((conv) => (
               <button
                 key={conv.userId}
                 onClick={() => setSelectedUser({ id: conv.userId, username: conv.username, avatar_url: conv.avatarUrl, online: conv.online, last_seen: null })}
-                className={`w-full px-5 py-4 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                  selectedUser?.id === conv.userId ? 'bg-gray-100' : ''
+                className={`w-full px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                  selectedUser?.id === conv.userId ? 'bg-gray-100 border-l-4 border-l-blue-500' : ''
                 }`}
               >
                 <div
@@ -390,9 +441,19 @@ export const Dashboard = () => {
                 </div>
               </div>
               <div className="flex gap-4">
-                <button className="text-gray-600 text-xl hover:text-gray-900"><Phone className="w-5 h-5" /></button>
-                <button className="text-gray-600 text-xl hover:text-gray-900"><Mail className="w-5 h-5" /></button>
-                <button className="text-gray-600 text-xl hover:text-gray-900" onClick={() => setShowSettings(true)}><FileText className="w-5 h-5" /></button>
+                <button className="text-gray-600 hover:text-gray-900 transition-colors" title="Call">
+                  <Phone className="w-5 h-5" />
+                </button>
+                <button className="text-gray-600 hover:text-gray-900 transition-colors" title="Video Call">
+                  <Mail className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className="text-gray-600 hover:text-gray-900 transition-colors"
+                  title="Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
               </div>
             </div>
 

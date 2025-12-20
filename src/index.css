@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Remove default margins and padding */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 /* Smooth scrolling behavior */
 html {
   scroll-behavior: smooth;
