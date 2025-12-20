@@ -104,11 +104,24 @@ export const Dashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const autoResizeTextarea = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    textarea.style.height = '40px';
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 40), 200);
+    textarea.style.height = `${newHeight}px`;
+  };
+
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [newMessage]);
 
   useEffect(() => {
     scrollToBottom();
@@ -383,6 +396,11 @@ export const Dashboard = () => {
 
     setMessages(prev => [...prev, tempMessage]);
     setNewMessage('');
+    
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '40px';
+    }
 
     try {
       await addDoc(collection(db, 'private_messages'), {
@@ -617,6 +635,7 @@ export const Dashboard = () => {
                         className={`group relative bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words transition-all hover:shadow-md ${
                           isSent ? 'rounded-br-sm' : 'rounded-bl-sm'
                         }`}
+                        style={{ whiteSpace: 'pre-wrap' }}
                       >
                         {msg.content}
                       </div>
@@ -643,14 +662,13 @@ export const Dashboard = () => {
             </div>
 
             <div className="px-8 py-5 border-t border-gray-200 bg-white">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                <button type="button" className="text-gray-600 hover:text-gray-900 transition-colors">
+              <form onSubmit={handleSendMessage} className="flex items-end gap-3">
+                <button type="button" className="text-gray-600 hover:text-gray-900 transition-colors mb-2">
                   <Paperclip className="w-5 h-5" />
                 </button>
                 <div className="flex-1 relative">
-                  <input
-                    ref={inputRef}
-                    type="text"
+                  <textarea
+                    ref={textareaRef}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={(e) => {
@@ -659,13 +677,15 @@ export const Dashboard = () => {
                         handleSendMessage(e);
                       }
                     }}
-                    placeholder="Type a message..."
-                    className="w-full px-5 py-3 border border-gray-200 rounded-[25px] text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="Type a message... (Shift+Enter for new line)"
+                    className="w-full px-5 py-3 border border-gray-200 rounded-[20px] text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all resize-none overflow-auto"
+                    style={{ minHeight: '40px', maxHeight: '200px', lineHeight: '1.5' }}
                     disabled={sending}
                     maxLength={1000}
+                    rows={1}
                   />
                   {newMessage.length > 800 && (
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                    <span className="absolute right-4 bottom-3 text-xs text-gray-400 bg-white px-1">
                       {newMessage.length}/1000
                     </span>
                   )}
@@ -673,7 +693,7 @@ export const Dashboard = () => {
                 <button
                   type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className="w-11 h-11 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
+                  className="w-11 h-11 mb-2 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 flex-shrink-0"
                   title="Send message (Enter)"
                 >
                   {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-4 h-4" />}
