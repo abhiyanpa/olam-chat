@@ -118,11 +118,15 @@ export const Dashboard = () => {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isShaking, setIsShaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { isMobile, isTablet } = useResponsive();
+
+  const MAX_MESSAGE_LENGTH = 4096;
 
   const scrollToBottom = (smooth = true) => {
     if (messagesContainerRef.current) {
@@ -498,6 +502,17 @@ export const Dashboard = () => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedUser || sending) return;
 
+    // Check character limit
+    if (newMessage.trim().length > MAX_MESSAGE_LENGTH) {
+      setErrorMessage(`Message is too long! Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`);
+      setIsShaking(true);
+      setTimeout(() => {
+        setIsShaking(false);
+        setErrorMessage('');
+      }, 3000);
+      return;
+    }
+
     setSending(true);
     const messageData: any = {
       content: newMessage.trim(),
@@ -533,10 +548,12 @@ export const Dashboard = () => {
     const chatId = [user!.uid, selectedUser.id].sort().join('_');
     typingManager.clearTyping(chatId, user!.uid);
     
-    // Reset textarea height
+    // Reset textarea height properly
     if (textareaRef.current) {
       textareaRef.current.style.height = '40px';
     }
+    // Call autoResize after state update to ensure proper reset
+    setTimeout(() => autoResizeTextarea(), 0);
 
     try {
       await addDoc(collection(db, 'private_messages'), messageData);
@@ -898,6 +915,16 @@ export const Dashboard = () => {
             </div>
 
             <div className="px-4 md:px-8 py-4 md:py-5 border-t border-gray-200 bg-white">
+              {/* Error Message */}
+              {errorMessage && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm text-red-800 flex-1">{errorMessage}</span>
+                </div>
+              )}
+              
               {/* Reply Preview */}
               {replyToMessage && (
                 <div className="mb-3 p-3 bg-gray-100 rounded-lg flex items-start justify-between">
@@ -943,19 +970,23 @@ export const Dashboard = () => {
                     className="w-full px-5 py-3 border border-gray-200 rounded-[20px] text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all resize-none overflow-auto"
                     style={{ minHeight: '40px', maxHeight: '200px', lineHeight: '1.5' }}
                     disabled={sending}
-                    maxLength={1000}
+                    maxLength={MAX_MESSAGE_LENGTH}
                     rows={1}
                   />
-                  {newMessage.length > 800 && (
-                    <span className="absolute right-4 bottom-3 text-xs text-gray-400 bg-white px-1">
-                      {newMessage.length}/1000
+                  {newMessage.length > MAX_MESSAGE_LENGTH * 0.8 && (
+                    <span className={`absolute right-4 bottom-3 text-xs px-1 bg-white ${
+                      newMessage.length >= MAX_MESSAGE_LENGTH ? 'text-red-500 font-semibold' : 'text-gray-400'
+                    }`}>
+                      {newMessage.length}/{MAX_MESSAGE_LENGTH}
                     </span>
                   )}
                 </div>
                 <button
                   type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className="w-11 h-11 mb-2 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 flex-shrink-0"
+                  className={`w-11 h-11 mb-2 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 flex-shrink-0 ${
+                    isShaking ? 'shake' : ''
+                  }`}
                   title="Send message (Enter)"
                 >
                   {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-4 h-4" />}
