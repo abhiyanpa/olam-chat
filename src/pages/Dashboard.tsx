@@ -221,18 +221,27 @@ export const Dashboard = () => {
         return;
       }
 
-      const profilesRef = collection(db, 'profiles');
-      const snapshot = await getDocs(profilesRef);
-      
-      const results = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as Profile))
-        .filter(profile => 
-          profile.id !== user?.uid &&
-          profile.username.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        .slice(0, 10);
+      try {
+        const profilesRef = collection(db, 'profiles');
+        const snapshot = await getDocs(profilesRef);
+        
+        const searchLower = searchQuery.toLowerCase().trim();
+        const results = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Profile))
+          .filter(profile => {
+            if (profile.id === user?.uid) return false;
+            if (!profile.username) return false;
+            
+            const username = profile.username.toLowerCase();
+            return username.includes(searchLower) || username.startsWith(searchLower);
+          })
+          .slice(0, 15);
 
-      setSearchResults(results);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      }
     };
 
     const timeoutId = setTimeout(searchUsers, 300);
