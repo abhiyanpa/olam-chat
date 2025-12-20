@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, User, Loader2 } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, OAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { AlertModal } from './AlertModal';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,69 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, type }) =
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if profile exists
+      const profileDoc = await getDoc(doc(db, 'profiles', user.uid));
+      
+      if (!profileDoc.exists()) {
+        // New user - create profile
+        const baseUsername = user.displayName?.replace(/\s+/g, '').toLowerCase() || user.email?.split('@')[0] || 'user';
+        let finalUsername = baseUsername;
+        let counter = 1;
+        
+        // Find available username
+        while (true) {
+          const usernameDoc = await getDoc(doc(db, 'usernames', finalUsername));
+          if (!usernameDoc.exists()) break;
+          finalUsername = `${baseUsername}${counter}`;
+          counter++;
+        }
+
+        // Create profile
+        await setDoc(doc(db, 'profiles', user.uid), {
+          username: finalUsername,
+          email: user.email,
+          avatar_url: user.photoURL,
+          online: true,
+          last_seen: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        // Reserve username
+        await setDoc(doc(db, 'usernames', finalUsername), {
+          uid: user.uid
+        });
+      } else {
+        // Existing user - update online status
+        await setDoc(doc(db, 'profiles', user.uid), {
+          online: true,
+          last_seen: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      setAlertType('success');
+      setAlertMessage('Login successful!');
+      setShowAlert(true);
+      onClose();
+      navigate('/dashboard', { replace: true });
+    } catch (error: any) {
+      setAlertType('error');
+      setAlertMessage(error.message);
+      setShowAlert(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setLoading(true);
+    try {
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
@@ -247,6 +310,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, type }) =
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
             <span>Google</span>
+          </button>
+
+          <button
+            onClick={handleAppleSignIn}
+            disabled={loading}
+            type="button"
+            className="mt-3 w-full py-3 px-4 rounded-lg shadow-lg text-white bg-black hover:bg-gray-900 border-2 border-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            </svg>
+            <span>Apple</span>
           </button>
         </div>
       </div>
