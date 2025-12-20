@@ -1,9 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { X, User, Mail, Camera, Loader2, LogOut } from 'lucide-react';
-import { auth, db, storage } from '../lib/firebase';
+import React, { useState } from 'react';
+import { X, User, Mail, Loader2, LogOut } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
 import { updateProfile, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { AlertModal } from './AlertModal';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,60 +16,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
   const navigate = useNavigate();
   const [username, setUsername] = useState(user?.displayName || '');
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState<'success' | 'error'>('success');
-  const [avatarUrl, setAvatarUrl] = useState(user?.photoURL || '');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Check file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      setAlertType('error');
-      setAlertMessage('Image must be less than 5MB');
-      setShowAlert(true);
-      return;
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setAlertType('error');
-      setAlertMessage('Only image files are allowed');
-      setShowAlert(true);
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      await updateProfile(auth.currentUser!, {
-        photoURL: downloadURL
-      });
-
-      await setDoc(doc(db, 'profiles', user.uid), {
-        avatar_url: downloadURL,
-        updated_at: new Date().toISOString()
-      }, { merge: true });
-
-      setAvatarUrl(downloadURL);
-      setAlertType('success');
-      setAlertMessage('Profile picture updated!');
-      setShowAlert(true);
-    } catch (error: any) {
-      setAlertType('error');
-      setAlertMessage(error.message);
-      setShowAlert(true);
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,9 +107,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
             </label>
             <div className="flex items-center space-x-4">
               <div className="relative">
-                {avatarUrl ? (
+                {user?.photoURL ? (
                   <img 
-                    src={avatarUrl} 
+                    src={user.photoURL} 
                     alt="Profile" 
                     className="w-20 h-20 rounded-full object-cover"
                   />
@@ -170,30 +118,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
                     {username[0]?.toUpperCase()}
                   </div>
                 )}
-                {uploading && (
-                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                    <Loader2 className="animate-spin text-white" size={24} />
-                  </div>
-                )}
               </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleAvatarChange}
-                accept="image/*"
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Camera className="h-5 w-5" />
-                <span>{uploading ? 'Uploading...' : 'Change'}</span>
-              </button>
+              <div className="flex-1">
+                <p className="text-sm text-gray-400">
+                  Profile picture is from your {user?.providerData?.[0]?.providerId?.includes('google') ? 'Google' : 
+                    user?.providerData?.[0]?.providerId?.includes('apple') ? 'Apple' : 'authentication'} account
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Sign in with Google or Apple to have a profile picture
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Max size: 5MB. Formats: JPG, PNG, GIF</p>
           </div>
 
           <div>
