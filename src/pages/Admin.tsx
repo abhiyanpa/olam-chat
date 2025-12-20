@@ -55,19 +55,33 @@ export const Admin: React.FC = () => {
     }
 
     try {
+      console.log('Checking admin access for user:', user.uid);
       const profileDoc = await getDoc(doc(db, 'profiles', user.uid));
+      console.log('Profile doc exists:', profileDoc.exists());
+      
+      if (!profileDoc.exists()) {
+        console.error('Profile not found');
+        alert('Profile not found. Please contact support.');
+        navigate('/dashboard');
+        return;
+      }
+      
       const profile = profileDoc.data();
+      console.log('Profile data:', profile);
+      console.log('User role:', profile?.role);
       
       if (profile?.role !== 'admin') {
-        alert('Access denied: Admin privileges required');
+        alert('Access denied: Admin privileges required. Your role: ' + (profile?.role || 'none'));
         navigate('/dashboard');
         return;
       }
 
+      console.log('Admin access granted');
       setIsAdmin(true);
       await loadData();
     } catch (error) {
       console.error('Error checking admin access:', error);
+      alert('Error checking admin access: ' + (error as Error).message);
       navigate('/dashboard');
     } finally {
       setLoading(false);

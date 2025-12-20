@@ -26,23 +26,12 @@ service cloud.firestore {
                       validateString(request.resource.data.username, 3, 20) &&
                       validateString(request.resource.data.email, 3, 100) &&
                       request.resource.data.username.matches('^[a-zA-Z0-9_]+$');
-      allow update: if (isOwner(userId) && 
-                      // Allow username updates with validation
-                      (!('username' in request.resource.data) || 
-                       (validateString(request.resource.data.username, 3, 20) &&
-                        request.resource.data.username.matches('^[a-zA-Z0-9_]+$'))) &&
-                      // Email cannot be changed
-                      (!('email' in request.resource.data) || 
-                       request.resource.data.email == resource.data.email) &&
-                      // Users cannot change their own role or banned status
-                      (!('role' in request.resource.data)) &&
-                      (!('banned' in request.resource.data))) ||
-                      // Admins can update banned status and view-only fields
+      allow update: if isOwner(userId) ||
+                      // Admins can update banned status
                       (isAdmin() && 
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['banned', 'updated_at']));
       allow delete: if false; // Prevent profile deletion
     }
-    
     // Usernames - for uniqueness checks with validation
     match /usernames/{username} {
       allow read: if isAuthenticated();
