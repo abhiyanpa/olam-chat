@@ -37,9 +37,8 @@ export const Home = () => {
   // Reset field
   const [resetEmail, setResetEmail] = useState('');
 
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  // Don't redirect authenticated users automatically - let them navigate where they want
+  // The Dashboard and Admin pages will handle their own auth checks
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
     const usernameDoc = await getDoc(doc(db, 'usernames', username));
