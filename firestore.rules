@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Profiles - users can read all, write their own
+    match /profiles/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Usernames - for uniqueness checks
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null;
+    }
+    
+    // Public messages - authenticated users can read/create
+    match /messages/{messageId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                      request.resource.data.user_id == request.auth.uid;
+    }
+    
+    // Private messages - only sender and receiver
+    match /private_messages/{messageId} {
+      allow read: if request.auth != null && 
+                    (resource.data.sender_id == request.auth.uid || 
+                     resource.data.receiver_id == request.auth.uid);
+      allow create: if request.auth != null && 
+                      request.resource.data.sender_id == request.auth.uid;
+      allow update: if request.auth != null && 
+                     (resource.data.sender_id == request.auth.uid ||
+                      resource.data.receiver_id == request.auth.uid);
+    }
+  }
+}
