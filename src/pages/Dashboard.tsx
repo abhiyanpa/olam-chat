@@ -548,12 +548,13 @@ export const Dashboard = () => {
     const chatId = [user!.uid, selectedUser.id].sort().join('_');
     typingManager.clearTyping(chatId, user!.uid);
     
-    // Reset textarea height properly
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '40px';
-    }
-    // Call autoResize after state update to ensure proper reset
-    setTimeout(() => autoResizeTextarea(), 0);
+    // Reset textarea height properly - wait for DOM to update
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '40px';
+        textareaRef.current.value = ''; // Ensure DOM value is cleared
+      }
+    });
 
     try {
       await addDoc(collection(db, 'private_messages'), messageData);
