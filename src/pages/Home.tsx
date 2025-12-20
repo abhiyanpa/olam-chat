@@ -28,7 +28,7 @@ export const Home = () => {
   const [password, setPassword] = useState('');
   
   // Register fields
-  const [regName, setRegName] = useState('');
+  const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
@@ -134,10 +134,41 @@ export const Home = () => {
       return;
     }
 
+    // Validate username format
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!usernameRegex.test(regUsername)) {
+      setError('Username must be 3-20 characters and contain only letters, numbers, and underscores');
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Check if username is available
+      const isAvailable = await checkUsernameAvailability(regUsername.toLowerCase());
+      if (!isAvailable) {
+        setError('Username is already taken');
+        setLoading(false);
+        return;
+      }
+
       const result = await createUserWithEmailAndPassword(auth, regEmail, regPassword);
-      await updateProfile(result.user, { displayName: regName });
-      await createUserProfile(result.user.uid, regEmail, regName);
+      await updateProfile(result.user, { displayName: regUsername });
+      
+      // Create profile with the chosen username
+      await setDoc(doc(db, 'profiles', result.user.uid), {
+        username: regUsername.toLowerCase(),
+        email: regEmail,
+        avatar_url: '',
+        online: true,
+        last_seen: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      // Reserve username
+      await setDoc(doc(db, 'usernames', regUsername.toLowerCase()), {
+        uid: result.user.uid
+      });
       
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
@@ -340,16 +371,20 @@ export const Home = () => {
 
               <form onSubmit={handleRegister}>
                 <div className="mb-5">
-                  <label className="block text-[#9ca3af] text-[13px] mb-2 font-medium">Full Name</label>
+                  <label className="block text-[#9ca3af] text-[13px] mb-2 font-medium">Username</label>
                   <input
                     type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="John Doe"
+                    value={regUsername}
+                    onChange={(e) => setRegUsername(e.target.value)}
+                    placeholder="johndoe (letters, numbers, underscores)"
                     required
                     disabled={loading}
+                    pattern="[a-zA-Z0-9_]{3,20}"
+                    minLength={3}
+                    maxLength={20}
                     className="w-full p-3.5 bg-[#1f1f2e] border border-[#3a3a4e] rounded-xl text-white text-[15px] focus:outline-none focus:border-[#667eea] focus:ring-2 focus:ring-[#667eea]/20 transition-all disabled:opacity-50"
                   />
+                  <p className="text-[#6b7280] text-xs mt-1">3-20 characters, no spaces or special characters</p>
                 </div>
 
                 <div className="mb-5">
