@@ -10,7 +10,10 @@ service cloud.firestore {
     // Usernames - for uniqueness checks
     match /usernames/{username} {
       allow read: if true;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && 
+                      request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && 
+                      resource.data.uid == request.auth.uid;
     }
     
     // Public messages - authenticated users can read/create

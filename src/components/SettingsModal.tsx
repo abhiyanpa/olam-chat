@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, User, Mail, Camera, Loader2, LogOut } from 'lucide-react';
 import { auth, db, storage } from '../lib/firebase';
 import { updateProfile, signOut } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { AlertModal } from './AlertModal';
 import { useNavigate } from 'react-router-dom';
@@ -78,6 +78,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
 
     try {
       if (!auth.currentUser) throw new Error('No user logged in');
+
+      // If username changed, check if new username is available
+      if (username.trim().toLowerCase() !== user.displayName?.toLowerCase()) {
+        const usernameDoc = await getDoc(doc(db, 'usernames', username.trim().toLowerCase()));
+        if (usernameDoc.exists() && usernameDoc.data().uid !== user.uid) {
+          throw new Error('Username is already taken');
+        }
+
+        // Remove old username reservation
+        if (user.displayName) {
+          await deleteDoc(doc(db, 'usernames', user.displayName.toLowerCase()));
+        }
+
+        // Reserve new username
+        await setDoc(doc(db, 'usernames', username.trim().toLowerCase()), {
+          uid: user.uid
+        });
+      }
 
       await updateProfile(auth.currentUser, {
         displayName: username.trim()
