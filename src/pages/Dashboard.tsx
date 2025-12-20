@@ -35,21 +35,62 @@ interface Conversation {
   online: boolean;
 }
 
-const getGradientForUser = (userId: string): string => {
-  const gradients = [
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-    'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-    'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-    'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
-    'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
-    'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+const getColorForUser = (userId: string): string => {
+  const colors = [
+    '#667eea', '#f093fb', '#4facfe', '#fa709a', '#a8edea',
+    '#ff9a9e', '#ffecd2', '#a1c4fd', '#e0c3fc', '#fbc2eb',
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#AAB7B8'
   ];
   const hash = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return gradients[hash % gradients.length];
+  return colors[hash % colors.length];
+};
+
+const getInitial = (username: string): string => {
+  if (!username) return '?';
+  return username.charAt(0).toUpperCase();
+};
+
+interface AvatarProps {
+  avatarUrl?: string;
+  username: string;
+  userId: string;
+  size?: number;
+}
+
+const Avatar: React.FC<AvatarProps> = ({ avatarUrl, username, userId, size = 40 }) => {
+  if (avatarUrl) {
+    return (
+      <div
+        className="rounded-full flex-shrink-0"
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          backgroundImage: `url(${avatarUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      />
+    );
+  }
+
+  const bgColor = getColorForUser(userId);
+  const initial = getInitial(username);
+  const fontSize = size * 0.45;
+
+  return (
+    <div
+      className="rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        backgroundColor: bgColor,
+        fontSize: `${fontSize}px`
+      }}
+    >
+      {initial}
+    </div>
+  );
 };
 
 export const Dashboard = () => {
@@ -327,15 +368,11 @@ export const Dashboard = () => {
         {/* User Header */}
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex-shrink-0"
-              style={user.photoURL ? {
-                backgroundImage: `url(${user.photoURL})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-              } : {
-                background: getGradientForUser(user.uid)
-              }}
+            <Avatar
+              avatarUrl={user.photoURL || undefined}
+              username={user.displayName || 'User'}
+              userId={user.uid}
+              size={40}
             />
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-sm text-black truncate">{user.displayName}</div>
@@ -390,15 +427,11 @@ export const Dashboard = () => {
                 }}
                 className="w-full px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
               >
-                <div
-                  className="w-10 h-10 rounded-full flex-shrink-0"
-                  style={profile.avatar_url ? {
-                    backgroundImage: `url(${profile.avatar_url})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  } : {
-                    background: getGradientForUser(profile.id)
-                  }}
+                <Avatar
+                  avatarUrl={profile.avatar_url}
+                  username={profile.username}
+                  userId={profile.id}
+                  size={40}
                 />
                 <div className="flex-1 text-left min-w-0">
                   <div className="font-semibold text-sm text-black mb-0.5">{profile.username}</div>
@@ -421,15 +454,11 @@ export const Dashboard = () => {
                   selectedUser?.id === conv.userId ? 'bg-gray-100 border-l-4 border-l-blue-500' : ''
                 }`}
               >
-                <div
-                  className="w-10 h-10 rounded-full flex-shrink-0"
-                  style={conv.avatarUrl ? {
-                    backgroundImage: `url(${conv.avatarUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  } : {
-                    background: getGradientForUser(conv.userId)
-                  }}
+                <Avatar
+                  avatarUrl={conv.avatarUrl}
+                  username={conv.username}
+                  userId={conv.userId}
+                  size={40}
                 />
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex items-center justify-between mb-1">
@@ -453,15 +482,11 @@ export const Dashboard = () => {
           <>
             <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full"
-                  style={selectedUser.avatar_url ? {
-                    backgroundImage: `url(${selectedUser.avatar_url})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  } : {
-                    background: getGradientForUser(selectedUser.id)
-                  }}
+                <Avatar
+                  avatarUrl={selectedUser.avatar_url}
+                  username={selectedUser.username}
+                  userId={selectedUser.id}
+                  size={40}
                 />
                 <div>
                   <div className="font-semibold text-black">{selectedUser.username}</div>
@@ -494,17 +519,17 @@ export const Dashboard = () => {
               {messages.map((msg) => {
                 const isSent = msg.sender_id === user.uid;
                 const msgUser = isSent ? user : selectedUser;
+                const msgUsername = isSent ? (user.displayName || 'User') : selectedUser.username;
+                const msgAvatar = isSent ? (user.photoURL || undefined) : selectedUser.avatar_url;
+                const msgUserId = isSent ? user.uid : selectedUser.id;
+                
                 return (
                   <div key={msg.id} className={`flex items-end gap-2.5 mb-4 ${isSent ? 'flex-row-reverse' : ''}`}>
-                    <div
-                      className="w-9 h-9 rounded-full flex-shrink-0"
-                      style={msgUser.avatar_url ? {
-                        backgroundImage: `url(${msgUser.avatar_url})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
-                      } : {
-                        background: getGradientForUser(msgUser.uid || msgUser.id)
-                      }}
+                    <Avatar
+                      avatarUrl={msgAvatar}
+                      username={msgUsername}
+                      userId={msgUserId}
+                      size={36}
                     />
                     <div className="flex flex-col max-w-[60%]">
                       <div className={`bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words ${isSent ? 'rounded-br-sm' : 'rounded-bl-sm'}`}>
