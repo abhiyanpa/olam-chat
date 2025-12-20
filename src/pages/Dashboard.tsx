@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
-import { Search, Phone, MoreVertical, Send, Paperclip, Smile, Loader2, Pin, Check, CheckCheck } from 'lucide-react';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
 
@@ -33,8 +33,24 @@ interface Conversation {
   lastMessageTime: any;
   unreadCount: number;
   online: boolean;
-  isTyping?: boolean;
 }
+
+const getGradientForUser = (userId: string): string => {
+  const gradients = [
+    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+    'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
+    'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+  ];
+  const hash = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return gradients[hash % gradients.length];
+};
 
 export const Dashboard = () => {
   const { user, loading } = useAuth();
@@ -45,7 +61,6 @@ export const Dashboard = () => {
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,20 +77,26 @@ export const Dashboard = () => {
     if (!timestamp) return '';
     try {
       const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
+  const formatListTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    try {
+      const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
       const now = new Date();
       const diff = now.getTime() - date.getTime();
       
-      if (diff < 60000) return 'Just now';
-      if (diff < 3600000) return Math.floor(diff / 60000) + ' min ago';
-      if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      if (diff < 604800000) return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      if (diff < 86400000) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch {
       return '';
     }
   };
 
-  // Fetch conversations
   useEffect(() => {
     if (!user) return;
 
@@ -111,7 +132,6 @@ export const Dashboard = () => {
       processSnapshot(snapshot1, true);
       processSnapshot(snapshot2, false);
 
-      // Fetch profiles for avatars and online status
       const profilesRef = collection(db, 'profiles');
       const profilesSnapshot = await getDocs(profilesRef);
       
@@ -125,20 +145,13 @@ export const Dashboard = () => {
         }
       });
 
-      // Count unread messages
-      const unreadQuery = query(
-        messagesRef,
-        where('receiver_id', '==', user.uid),
-        where('read', '==', false)
-      );
+      const unreadQuery = query(messagesRef, where('receiver_id', '==', user.uid), where('read', '==', false));
       const unreadSnapshot = await getDocs(unreadQuery);
       
       unreadSnapshot.forEach((doc) => {
         const msg = doc.data();
         const conversation = conversationMap.get(msg.sender_id);
-        if (conversation) {
-          conversation.unreadCount++;
-        }
+        if (conversation) conversation.unreadCount++;
       });
 
       setConversations(Array.from(conversationMap.values()));
@@ -146,7 +159,6 @@ export const Dashboard = () => {
 
     updateConversations();
 
-    // Listen for new messages
     const messagesRef = collection(db, 'private_messages');
     const q = query(messagesRef, where('receiver_id', '==', user.uid), orderBy('created_at', 'desc'));
     
@@ -157,33 +169,18 @@ export const Dashboard = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // Fetch messages for selected conversation
   useEffect(() => {
     if (!user || !selectedUser) return;
 
     const messagesRef = collection(db, 'private_messages');
-    const q1 = query(
-      messagesRef,
-      where('sender_id', '==', user.uid),
-      where('receiver_id', '==', selectedUser.id),
-      orderBy('created_at', 'asc')
-    );
-    const q2 = query(
-      messagesRef,
-      where('sender_id', '==', selectedUser.id),
-      where('receiver_id', '==', user.uid),
-      orderBy('created_at', 'asc')
-    );
+    const q1 = query(messagesRef, where('sender_id', '==', user.uid), where('receiver_id', '==', selectedUser.id), orderBy('created_at', 'asc'));
+    const q2 = query(messagesRef, where('sender_id', '==', selectedUser.id), where('receiver_id', '==', user.uid), orderBy('created_at', 'asc'));
 
     const unsubscribe1 = onSnapshot(q1, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
       setMessages(prev => {
         const combined = [...prev.filter(m => m.sender_id !== user.uid || m.receiver_id !== selectedUser.id), ...msgs];
-        return combined.sort((a, b) => {
-          const aTime = a.created_at?.toMillis?.() || 0;
-          const bTime = b.created_at?.toMillis?.() || 0;
-          return aTime - bTime;
-        });
+        return combined.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
       });
     });
 
@@ -191,14 +188,9 @@ export const Dashboard = () => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
       setMessages(prev => {
         const combined = [...prev.filter(m => m.sender_id !== selectedUser.id || m.receiver_id !== user.uid), ...msgs];
-        return combined.sort((a, b) => {
-          const aTime = a.created_at?.toMillis?.() || 0;
-          const bTime = b.created_at?.toMillis?.() || 0;
-          return aTime - bTime;
-        });
+        return combined.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
       });
 
-      // Mark messages as read (batch update, max 5 at a time)
       const unreadMessages = snapshot.docs.filter(doc => !doc.data().read).slice(0, 5);
       if (unreadMessages.length > 0) {
         const batch = writeBatch(db);
@@ -215,16 +207,13 @@ export const Dashboard = () => {
     };
   }, [user, selectedUser]);
 
-  // Handle search
   useEffect(() => {
     const searchUsers = async () => {
       if (!searchQuery.trim()) {
         setSearchResults([]);
-        setIsSearching(false);
         return;
       }
 
-      setIsSearching(true);
       const profilesRef = collection(db, 'profiles');
       const snapshot = await getDocs(profilesRef);
       
@@ -237,7 +226,6 @@ export const Dashboard = () => {
         .slice(0, 10);
 
       setSearchResults(results);
-      setIsSearching(false);
     };
 
     const timeoutId = setTimeout(searchUsers, 300);
@@ -249,9 +237,8 @@ export const Dashboard = () => {
     if (!newMessage.trim() || !selectedUser || sending) return;
 
     setSending(true);
-    const tempId = crypto.randomUUID();
     const tempMessage: Message = {
-      id: tempId,
+      id: crypto.randomUUID(),
       content: newMessage.trim(),
       sender_id: user!.uid,
       receiver_id: selectedUser.id,
@@ -273,34 +260,16 @@ export const Dashboard = () => {
         read: false,
       });
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error:', error);
     } finally {
       setSending(false);
     }
   };
 
-  const selectConversation = (conversation: Conversation) => {
-    setSelectedUser({
-      id: conversation.userId,
-      username: conversation.username,
-      avatar_url: conversation.avatarUrl,
-      online: conversation.online,
-      last_seen: null,
-    });
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const selectSearchResult = (profile: Profile) => {
-    setSelectedUser(profile);
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
       </div>
     );
   }
@@ -308,194 +277,121 @@ export const Dashboard = () => {
   if (!user) return <Navigate to="/" replace />;
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
+    <div className="h-screen bg-white flex overflow-hidden max-w-[1400px] mx-auto">
       <Helmet>
         <title>Messages - Olam Chat</title>
       </Helmet>
 
-      {/* Left Sidebar - Conversations */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        {/* Search Header */}
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <MoreVertical className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
-          
+      {/* Sidebar */}
+      <div className="w-[280px] bg-[#fafafa] border-r border-gray-200 flex flex-col">
+        <div className="p-5 border-b border-gray-200">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-300"
             />
           </div>
         </div>
 
-        {/* Conversations List */}
+        <div className="px-5 py-5 text-lg font-semibold text-black">Messages</div>
+
         <div className="flex-1 overflow-y-auto">
           {searchResults.length > 0 ? (
             searchResults.map((profile) => (
               <button
                 key={profile.id}
-                onClick={() => selectSearchResult(profile)}
-                className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50"
+                onClick={() => {
+                  setSelectedUser(profile);
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                className="w-full px-5 py-4 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
               >
-                <div className="relative">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.username}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold">
-                      {profile.username[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  {profile.online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                  )}
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-semibold text-gray-900">{profile.username}</p>
-                  <p className="text-sm text-gray-500">Start a conversation</p>
+                <div
+                  className="w-10 h-10 rounded-full flex-shrink-0"
+                  style={{ background: getGradientForUser(profile.id) }}
+                />
+                <div className="flex-1 text-left min-w-0">
+                  <div className="font-semibold text-sm text-black mb-1">{profile.username}</div>
+                  <div className="text-xs text-gray-500">Start conversation</div>
                 </div>
               </button>
             ))
           ) : (
-            conversations.map((conversation) => (
+            conversations.map((conv) => (
               <button
-                key={conversation.userId}
-                onClick={() => selectConversation(conversation)}
-                className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${
-                  selectedUser?.id === conversation.userId ? 'bg-primary-50' : ''
+                key={conv.userId}
+                onClick={() => setSelectedUser({ id: conv.userId, username: conv.username, avatar_url: conv.avatarUrl, online: conv.online, last_seen: null })}
+                className={`w-full px-5 py-4 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                  selectedUser?.id === conv.userId ? 'bg-gray-100' : ''
                 }`}
               >
-                <div className="relative">
-                  {conversation.avatarUrl ? (
-                    <img
-                      src={conversation.avatarUrl}
-                      alt={conversation.username}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold">
-                      {conversation.username[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  {conversation.online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                  )}
-                </div>
+                <div
+                  className="w-10 h-10 rounded-full flex-shrink-0"
+                  style={{ background: conv.avatarUrl ? `url(${conv.avatarUrl})` : getGradientForUser(conv.userId), backgroundSize: 'cover' }}
+                />
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <p className="font-semibold text-gray-900 truncate">{conversation.username}</p>
-                    <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                      {formatTime(conversation.lastMessageTime)}
-                    </span>
+                    <span className="font-semibold text-sm text-black">{conv.username}</span>
+                    <span className="text-xs text-gray-500 ml-2">{formatListTime(conv.lastMessageTime)}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600 truncate">
-                      {conversation.isTyping ? (
-                        <span className="text-primary-600 italic">is typing...</span>
-                      ) : (
-                        conversation.lastMessage
-                      )}
-                    </p>
-                    {conversation.unreadCount > 0 && (
-                      <span className="ml-2 px-2 py-0.5 bg-primary-600 text-white text-xs rounded-full flex-shrink-0">
-                        {conversation.unreadCount}
-                      </span>
-                    )}
-                  </div>
+                  <div className="text-[13px] text-gray-600 truncate">{conv.lastMessage}</div>
                 </div>
+                {conv.unreadCount > 0 && (
+                  <div className="w-2 h-2 bg-orange-400 rounded-full mt-2" />
+                )}
               </button>
             ))
           )}
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col bg-white">
         {selectedUser ? (
           <>
-            {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  {selectedUser.avatar_url ? (
-                    <img
-                      src={selectedUser.avatar_url}
-                      alt={selectedUser.username}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold">
-                      {selectedUser.username[0]?.toUpperCase()}
+                <div
+                  className="w-10 h-10 rounded-full"
+                  style={{ background: selectedUser.avatar_url ? `url(${selectedUser.avatar_url})` : getGradientForUser(selectedUser.id), backgroundSize: 'cover' }}
+                />
+                <div>
+                  <div className="font-semibold text-black">{selectedUser.username}</div>
+                  {selectedUser.online && (
+                    <div className="text-xs text-green-600 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-green-600 rounded-full" />
+                      Online
                     </div>
                   )}
-                  {selectedUser.online && (
-                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{selectedUser.username}</h3>
-                  <p className="text-xs text-green-600">
-                    {selectedUser.online ? 'Online' : 'Offline'}
-                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Pin className="w-5 h-5 text-gray-600" />
-                </button>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Phone className="w-5 h-5 text-gray-600" />
-                </button>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <MoreVertical className="w-5 h-5 text-gray-600" />
-                </button>
+              <div className="flex gap-4">
+                <button className="text-gray-600 text-xl hover:text-gray-900"><Phone className="w-5 h-5" /></button>
+                <button className="text-gray-600 text-xl hover:text-gray-900"><Mail className="w-5 h-5" /></button>
+                <button className="text-gray-600 text-xl hover:text-gray-900" onClick={() => setShowSettings(true)}><FileText className="w-5 h-5" /></button>
               </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((message) => {
-                const isSent = message.sender_id === user.uid;
+            <div className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafafa]">
+              {messages.map((msg) => {
+                const isSent = msg.sender_id === user.uid;
                 return (
-                  <div
-                    key={message.id}
-                    className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}
-                  >
+                  <div key={msg.id} className={`flex items-start gap-3 mb-5 ${isSent ? 'flex-row-reverse' : ''}`}>
                     <div
-                      className={`max-w-md px-4 py-3 rounded-2xl ${
-                        isSent
-                          ? 'bg-gray-900 text-white rounded-br-sm'
-                          : 'bg-gray-100 text-gray-900 rounded-bl-sm'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                      <div className="flex items-center justify-end gap-1 mt-1">
-                        <span className="text-xs opacity-70">{formatTime(message.created_at)}</span>
-                        {isSent && (
-                          <span className="opacity-70">
-                            {message.status === 'sending' ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : message.read ? (
-                              <CheckCheck className="w-3 h-3" />
-                            ) : (
-                              <Check className="w-3 h-3" />
-                            )}
-                          </span>
-                        )}
+                      className="w-10 h-10 rounded-full flex-shrink-0"
+                      style={{ background: getGradientForUser(isSent ? user.uid : selectedUser.id), backgroundSize: 'cover' }}
+                    />
+                    <div className="max-w-[60%]">
+                      <div className="bg-[#2c2c2c] text-white px-4 py-3 rounded-[18px] text-sm leading-relaxed">
+                        {msg.content}
+                      </div>
+                      <div className={`text-[11px] text-gray-500 mt-1 px-1 ${isSent ? 'text-right' : ''}`}>
+                        {formatTime(msg.created_at)}
                       </div>
                     </div>
                   </div>
@@ -504,14 +400,10 @@ export const Dashboard = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
-            <div className="bg-white border-t border-gray-200 p-4">
+            <div className="px-8 py-5 border-t border-gray-200 bg-white">
               <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Paperclip className="w-5 h-5 text-gray-600" />
+                <button type="button" className="text-gray-600 hover:text-gray-900">
+                  <Paperclip className="w-5 h-5" />
                 </button>
                 <input
                   ref={inputRef}
@@ -519,19 +411,15 @@ export const Dashboard = () => {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Write a Message"
-                  className="flex-1 px-4 py-3 bg-gray-50 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="flex-1 px-5 py-3 border border-gray-200 rounded-[25px] text-sm focus:outline-none focus:border-gray-300"
                   disabled={sending}
                 />
                 <button
                   type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className="p-3 bg-gray-900 hover:bg-gray-800 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-11 h-11 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {sending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
+                  {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </form>
             </div>
@@ -542,18 +430,14 @@ export const Dashboard = () => {
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Search className="w-10 h-10 text-gray-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No conversation selected</h3>
-              <p className="text-gray-500">Choose a conversation from the list or search for someone</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a conversation</h3>
+              <p className="text-gray-500">Choose from your messages or search for someone</p>
             </div>
           </div>
         )}
       </div>
 
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        user={user}
-      />
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} user={user} />
     </div>
   );
 };
