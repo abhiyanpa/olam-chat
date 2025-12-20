@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Navigate } from 'react-router-dom';
-import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft, Reply, Check, CheckCheck } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft, Reply, Check, CheckCheck, Shield } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
 import { soundManager } from '../lib/sounds';
@@ -105,6 +105,7 @@ const Avatar: React.FC<AvatarProps> = ({ avatarUrl, username, userId, size = 40 
 
 export const Dashboard = () => {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
@@ -121,6 +122,7 @@ export const Dashboard = () => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [isShaking, setIsShaking] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -128,6 +130,21 @@ export const Dashboard = () => {
   const { isMobile, isTablet } = useResponsive();
 
   const MAX_MESSAGE_LENGTH = 4096;
+
+  // Check if user is admin
+  useEffect(() => {
+    if (!user) return;
+    const checkAdmin = async () => {
+      try {
+        const profileDoc = await getDoc(doc(db, 'profiles', user.uid));
+        const profile = profileDoc.data();
+        setIsAdmin(profile?.role === 'admin');
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+    checkAdmin();
+  }, [user]);
 
   const scrollToBottom = (smooth = true) => {
     if (messagesContainerRef.current) {
@@ -644,6 +661,15 @@ export const Dashboard = () => {
           >
             {soundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
+          {isAdmin && (
+            <button 
+              onClick={() => navigate('/admin')}
+              className="text-purple-600 hover:text-purple-900 transition-colors"
+              title="Admin Panel"
+            >
+              <Shield className="w-5 h-5" />
+            </button>
+          )}
           <button 
             onClick={() => setShowSettings(true)}
             className="text-gray-600 hover:text-gray-900 transition-colors"

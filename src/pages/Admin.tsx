@@ -34,10 +34,10 @@ interface Stats {
 }
 
 export const Admin: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, bannedUsers: 0, totalMessages: 0, onlineUsers: 0 });
@@ -45,8 +45,10 @@ export const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'messages' | 'stats'>('users');
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking admin access
+    if (authLoading) return;
     checkAdminAccess();
-  }, [user]);
+  }, [user, authLoading]);
 
   const checkAdminAccess = async () => {
     if (!user) {
@@ -84,7 +86,7 @@ export const Admin: React.FC = () => {
       alert('Error checking admin access: ' + (error as Error).message);
       navigate('/dashboard');
     } finally {
-      setLoading(false);
+      setPageLoading(false);
     }
   };
 
@@ -161,7 +163,7 @@ export const Admin: React.FC = () => {
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) {
+  if (pageLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
