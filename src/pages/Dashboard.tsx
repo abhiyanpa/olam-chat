@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
-import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft } from 'lucide-react';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft, Reply, Check, CheckCheck } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
 import { soundManager } from '../lib/sounds';
 import { useResponsive } from '../hooks/useResponsive';
+import { typingManager } from '../lib/typing';
 
 interface Profile {
   id: string;
@@ -24,7 +25,13 @@ interface Message {
   receiver_id: string;
   created_at: any;
   read?: boolean;
-  status?: 'sending' | 'sent' | 'delivered';
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  replyTo?: {
+    messageId: string;
+    content: string;
+    senderId: string;
+    senderName: string;
+  };
 }
 
 interface Conversation {
@@ -109,6 +116,8 @@ export const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -135,6 +144,12 @@ export const Dashboard = () => {
     textarea.style.height = '40px';
     const newHeight = Math.min(Math.max(textarea.scrollHeight, 40), 200);
     textarea.style.height = `${newHeight}px`;
+  };
+
+  const handleTyping = () => {
+    if (!selectedUser || !user) return;
+    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    typingManager.debounceTyping(chatId, user.uid, user.displayName || 'User');
   };
 
   const toggleSound = () => {
@@ -182,12 +197,27 @@ export const Dashboard = () => {
     }
   }, [selectedUser, isMobile]);
 
+  // Typing indicator listener
+  useEffect(() => {
+    if (!selectedUser || !user) return;
+
+    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    const unsubscribe = typingManager.listenToTyping(chatId, user.uid, setTypingUsers);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+      typingManager.clearTyping(chatId, user.uid);
+    };
+  }, [selectedUser, user]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showSettings) {
           setShowSettings(false);
+        } else if (replyToMessage) {
+          setReplyToMessage(null);
         } else if (isMobile && !sidebarOpen && selectedUser) {
           setSidebarOpen(true);
         }
@@ -452,17 +482,39 @@ export const Dashboard = () => {
     if (!newMessage.trim() || !selectedUser || sending) return;
 
     setSending(true);
-    const tempMessage: Message = {
-      id: crypto.randomUUID(),
+    const messageData: any = {
       content: newMessage.trim(),
       sender_id: user!.uid,
       receiver_id: selectedUser.id,
+      sender_name: user!.displayName,
+      receiver_name: selectedUser.username,
       created_at: Timestamp.now(),
+      read: false,
+      status: 'sent'
+    };
+
+    if (replyToMessage) {
+      messageData.replyTo = {
+        messageId: replyToMessage.id,
+        content: replyToMessage.content,
+        senderId: replyToMessage.sender_id,
+        senderName: replyToMessage.sender_id === user!.uid ? user!.displayName : selectedUser.username
+      };
+    }
+
+    const tempMessage: Message = {
+      id: crypto.randomUUID(),
+      ...messageData,
       status: 'sending',
     };
 
     setMessages(prev => [...prev, tempMessage]);
     setNewMessage('');
+    setReplyToMessage(null);
+    
+    // Clear typing status
+    const chatId = [user!.uid, selectedUser.id].sort().join('_');
+    typingManager.clearTyping(chatId, user!.uid);
     
     // Reset textarea height
     if (textareaRef.current) {
@@ -470,15 +522,7 @@ export const Dashboard = () => {
     }
 
     try {
-      await addDoc(collection(db, 'private_messages'), {
-        content: tempMessage.content,
-        sender_id: user!.uid,
-        receiver_id: selectedUser.id,
-        sender_name: user!.displayName,
-        receiver_name: selectedUser.username,
-        created_at: Timestamp.now(),
-        read: false,
-      });
+      await addDoc(collection(db, 'private_messages'), messageData);
       
       // Play sent sound
       soundManager.playSent();
@@ -711,6 +755,25 @@ export const Dashboard = () => {
               </div>
             </div>
 
+            {/* Typing Indicator */}
+            {typingUsers.length > 0 && (
+              <div className="px-4 md:px-8 py-2 bg-gray-50 border-b border-gray-200">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span>
+                    {typingUsers.length === 1 
+                      ? `${typingUsers[0]} is typing...`
+                      : `${typingUsers[0]} and ${typingUsers.length - 1} other${typingUsers.length > 2 ? 's' : ''} are typing...`
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div 
               ref={messagesContainerRef}
               className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 bg-[#fafafa] relative"
@@ -725,7 +788,7 @@ export const Dashboard = () => {
                 const isGrouped = shouldGroupMessages(msg, prevMsg);
                 
                 return (
-                  <div key={msg.id} className={`flex items-end gap-2.5 ${isGrouped ? 'mb-1' : 'mb-4'} ${isSent ? 'flex-row-reverse' : ''}`}>
+                  <div key={msg.id} className={`flex items-end gap-2.5 ${isGrouped ? 'mb-1' : 'mb-4'} ${isSent ? 'flex-row-reverse' : ''} group`}>
                     {!isGrouped ? (
                       <Avatar
                         avatarUrl={msgAvatar}
@@ -736,27 +799,51 @@ export const Dashboard = () => {
                     ) : (
                       <div className="w-9" />
                     )}
-                    <div className="flex flex-col max-w-[60%]">
+                    <div className="flex flex-col max-w-[60%] relative">
+                      {/* Reply preview */}
+                      {msg.replyTo && (
+                        <div className={`mb-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs ${isSent ? 'ml-auto' : ''}`}>
+                          <div className="font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                            {msg.replyTo.senderName}
+                          </div>
+                          <div className="text-gray-500 dark:text-gray-400 truncate">
+                            {msg.replyTo.content.substring(0, 50)}{msg.replyTo.content.length > 50 ? '...' : ''}
+                          </div>
+                        </div>
+                      )}
+                      
                       <div 
-                        className={`group relative bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words transition-all hover:shadow-md ${
+                        className={`relative bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words transition-all hover:shadow-md ${
                           isSent ? 'rounded-br-sm' : 'rounded-bl-sm'
                         }`}
                         style={{ whiteSpace: 'pre-wrap' }}
                       >
                         {msg.content}
+                        
+                        {/* Reply button on hover - desktop only */}
+                        {!isMobile && (
+                          <button
+                            onClick={() => setReplyToMessage(msg)}
+                            className={`absolute -top-3 ${isSent ? '-left-8' : '-right-8'} opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-gray-200 hover:bg-gray-300 rounded-full`}
+                            title="Reply to message"
+                          >
+                            <Reply className="w-4 h-4 text-gray-700" />
+                          </button>
+                        )}
                       </div>
                       {!isGrouped && (
                         <div className={`text-[11px] text-gray-500 mt-1 px-1 flex items-center gap-1 ${isSent ? 'flex-row-reverse' : ''}`}>
                           <span>{formatTime(msg.created_at)}</span>
-                          {isSent && msg.read && (
-                            <svg className="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                            </svg>
-                          )}
-                          {isSent && !msg.read && (
-                            <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                            </svg>
+                          {isSent && (
+                            <span className="flex items-center">
+                              {msg.status === 'read' || msg.read ? (
+                                <CheckCheck className="w-3.5 h-3.5 text-blue-600" />
+                              ) : msg.status === 'delivered' ? (
+                                <CheckCheck className="w-3.5 h-3.5 text-gray-400" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5 text-gray-400" />
+                              )}
+                            </span>
                           )}
                         </div>
                       )}
@@ -784,6 +871,29 @@ export const Dashboard = () => {
             </div>
 
             <div className="px-4 md:px-8 py-4 md:py-5 border-t border-gray-200 bg-white">
+              {/* Reply Preview */}
+              {replyToMessage && (
+                <div className="mb-3 p-3 bg-gray-100 rounded-lg flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Reply className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      <span className="text-xs font-semibold text-gray-600">
+                        Replying to {replyToMessage.sender_id === user.uid ? 'yourself' : selectedUser?.username}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 truncate">
+                      {replyToMessage.content}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setReplyToMessage(null)}
+                    className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+              )}
+              
               <form onSubmit={handleSendMessage} className="flex items-end gap-3">
                 <button type="button" className="text-gray-600 hover:text-gray-900 transition-colors mb-2">
                   <Paperclip className="w-5 h-5" />
@@ -792,7 +902,10 @@ export const Dashboard = () => {
                   <textarea
                     ref={textareaRef}
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      handleTyping();
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();

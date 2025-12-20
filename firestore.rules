@@ -34,5 +34,11 @@ service cloud.firestore {
                      (resource.data.sender_id == request.auth.uid ||
                       resource.data.receiver_id == request.auth.uid);
     }
+    
+    // Typing status - users can read their chat's status, write their own
+    match /typing_status/{statusId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
   }
 }
