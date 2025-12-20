@@ -170,26 +170,33 @@ export const Dashboard = () => {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !selectedUser) return;
+    if (!user || !selectedUser) {
+      setMessages([]);
+      return;
+    }
+
+    // Clear messages when switching conversations
+    setMessages([]);
 
     const messagesRef = collection(db, 'private_messages');
     const q1 = query(messagesRef, where('sender_id', '==', user.uid), where('receiver_id', '==', selectedUser.id), orderBy('created_at', 'asc'));
     const q2 = query(messagesRef, where('sender_id', '==', selectedUser.id), where('receiver_id', '==', user.uid), orderBy('created_at', 'asc'));
 
+    let sentMessages: Message[] = [];
+    let receivedMessages: Message[] = [];
+
     const unsubscribe1 = onSnapshot(q1, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-      setMessages(prev => {
-        const combined = [...prev.filter(m => m.sender_id !== user.uid || m.receiver_id !== selectedUser.id), ...msgs];
-        return combined.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
-      });
+      sentMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      const allMessages = [...sentMessages, ...receivedMessages];
+      allMessages.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
+      setMessages(allMessages);
     });
 
     const unsubscribe2 = onSnapshot(q2, async (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-      setMessages(prev => {
-        const combined = [...prev.filter(m => m.sender_id !== selectedUser.id || m.receiver_id !== user.uid), ...msgs];
-        return combined.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
-      });
+      receivedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      const allMessages = [...sentMessages, ...receivedMessages];
+      allMessages.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
+      setMessages(allMessages);
 
       const unreadMessages = snapshot.docs.filter(doc => !doc.data().read).slice(0, 5);
       if (unreadMessages.length > 0) {
@@ -332,7 +339,13 @@ export const Dashboard = () => {
               >
                 <div
                   className="w-10 h-10 rounded-full flex-shrink-0"
-                  style={{ background: conv.avatarUrl ? `url(${conv.avatarUrl})` : getGradientForUser(conv.userId), backgroundSize: 'cover' }}
+                  style={conv.avatarUrl ? {
+                    backgroundImage: `url(${conv.avatarUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  } : {
+                    background: getGradientForUser(conv.userId)
+                  }}
                 />
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex items-center justify-between mb-1">
@@ -358,7 +371,13 @@ export const Dashboard = () => {
               <div className="flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-full"
-                  style={{ background: selectedUser.avatar_url ? `url(${selectedUser.avatar_url})` : getGradientForUser(selectedUser.id), backgroundSize: 'cover' }}
+                  style={selectedUser.avatar_url ? {
+                    backgroundImage: `url(${selectedUser.avatar_url})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  } : {
+                    background: getGradientForUser(selectedUser.id)
+                  }}
                 />
                 <div>
                   <div className="font-semibold text-black">{selectedUser.username}</div>
@@ -380,17 +399,24 @@ export const Dashboard = () => {
             <div className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafafa]">
               {messages.map((msg) => {
                 const isSent = msg.sender_id === user.uid;
+                const msgUser = isSent ? user : selectedUser;
                 return (
-                  <div key={msg.id} className={`flex items-start gap-3 mb-5 ${isSent ? 'flex-row-reverse' : ''}`}>
+                  <div key={msg.id} className={`flex items-end gap-2.5 mb-4 ${isSent ? 'flex-row-reverse' : ''}`}>
                     <div
-                      className="w-10 h-10 rounded-full flex-shrink-0"
-                      style={{ background: getGradientForUser(isSent ? user.uid : selectedUser.id), backgroundSize: 'cover' }}
+                      className="w-9 h-9 rounded-full flex-shrink-0"
+                      style={msgUser.avatar_url ? {
+                        backgroundImage: `url(${msgUser.avatar_url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center'
+                      } : {
+                        background: getGradientForUser(msgUser.uid || msgUser.id)
+                      }}
                     />
-                    <div className="max-w-[60%]">
-                      <div className="bg-[#2c2c2c] text-white px-4 py-3 rounded-[18px] text-sm leading-relaxed">
+                    <div className="flex flex-col max-w-[60%]">
+                      <div className={`bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words ${isSent ? 'rounded-br-sm' : 'rounded-bl-sm'}`}>
                         {msg.content}
                       </div>
-                      <div className={`text-[11px] text-gray-500 mt-1 px-1 ${isSent ? 'text-right' : ''}`}>
+                      <div className={`text-[11px] text-gray-500 mt-1 px-1 ${isSent ? 'text-right' : 'text-left'}`}>
                         {formatTime(msg.created_at)}
                       </div>
                     </div>
