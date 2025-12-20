@@ -139,9 +139,9 @@ export const Dashboard = () => {
         const profile = doc.data();
         const conversation = conversationMap.get(doc.id);
         if (conversation) {
-          conversation.avatarUrl = profile.avatar_url;
-          conversation.online = profile.online;
-          conversation.username = profile.username;
+          conversation.avatarUrl = profile.avatar_url || '';
+          conversation.online = profile.online || false;
+          conversation.username = profile.username || conversation.username;
         }
       });
 
@@ -154,19 +154,43 @@ export const Dashboard = () => {
         if (conversation) conversation.unreadCount++;
       });
 
-      setConversations(Array.from(conversationMap.values()));
+      // Sort conversations by latest message time (newest first)
+      const sortedConversations = Array.from(conversationMap.values()).sort((a, b) => {
+        const timeA = a.lastMessageTime?.toMillis?.() || 0;
+        const timeB = b.lastMessageTime?.toMillis?.() || 0;
+        return timeB - timeA; // Descending order (newest first)
+      });
+
+      setConversations(sortedConversations);
     };
 
     updateConversations();
 
     const messagesRef = collection(db, 'private_messages');
-    const q = query(messagesRef, where('receiver_id', '==', user.uid), orderBy('created_at', 'desc'));
     
-    const unsubscribe = onSnapshot(q, () => {
+    // Listen for both sent and received messages to update conversation list
+    const q1 = query(messagesRef, where('receiver_id', '==', user.uid), orderBy('created_at', 'desc'));
+    const q2 = query(messagesRef, where('sender_id', '==', user.uid), orderBy('created_at', 'desc'));
+    
+    const unsubscribe1 = onSnapshot(q1, () => {
+      updateConversations();
+    });
+    
+    const unsubscribe2 = onSnapshot(q2, () => {
       updateConversations();
     });
 
-    return () => unsubscribe();
+    // Listen for profile updates to sync avatars in real-time
+    const profilesRef = collection(db, 'profiles');
+    const unsubscribe3 = onSnapshot(profilesRef, () => {
+      updateConversations();
+    });
+
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+      unsubscribe3();
+    };
   }, [user]);
 
   useEffect(() => {
