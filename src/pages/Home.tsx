@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../lib/AuthContext';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -18,7 +18,7 @@ import { validateUsername, validateEmail } from '../lib/security';
 type FormType = 'login' | 'register' | 'reset';
 
 export const Home = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [formType, setFormType] = useState<FormType>('login');
   const [loading, setLoading] = useState(false);
@@ -37,8 +37,13 @@ export const Home = () => {
   // Reset field
   const [resetEmail, setResetEmail] = useState('');
 
-  // Don't redirect authenticated users automatically - let them navigate where they want
-  // The Dashboard and Admin pages will handle their own auth checks
+  // Redirect authenticated users back to the dashboard
+  useEffect(() => {
+    if (authLoading) return;
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
     const usernameDoc = await getDoc(doc(db, 'usernames', username));
