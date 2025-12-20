@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate } from 'react-router-dom';
-import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu } from 'lucide-react';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
+import { soundManager } from '../lib/sounds';
 
 interface Profile {
   id: string;
@@ -103,6 +104,7 @@ export const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [sending, setSending] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(() => soundManager.isSoundMuted());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -117,6 +119,11 @@ export const Dashboard = () => {
     textarea.style.height = '40px';
     const newHeight = Math.min(Math.max(textarea.scrollHeight, 40), 200);
     textarea.style.height = `${newHeight}px`;
+  };
+
+  const toggleSound = () => {
+    const newMutedState = soundManager.toggleMute();
+    setSoundMuted(newMutedState);
   };
 
   useEffect(() => {
@@ -328,6 +335,14 @@ export const Dashboard = () => {
       receivedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
       const allMessages = [...sentMessages, ...receivedMessages];
       allMessages.sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0));
+      
+      // Play sound for new received messages
+      const prevMessageCount = messages.filter(m => m.sender_id === selectedUser.id).length;
+      const newMessageCount = receivedMessages.length;
+      if (newMessageCount > prevMessageCount) {
+        soundManager.playReceived();
+      }
+      
       setMessages(allMessages);
 
       const unreadMessages = snapshot.docs.filter(doc => !doc.data().read).slice(0, 5);
@@ -412,6 +427,9 @@ export const Dashboard = () => {
         created_at: Timestamp.now(),
         read: false,
       });
+      
+      // Play sent sound
+      soundManager.playSent();
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -454,6 +472,13 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
+          <button 
+            onClick={toggleSound}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+            title={soundMuted ? 'Unmute sounds' : 'Mute sounds'}
+          >
+            {soundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
           <button 
             onClick={() => setShowSettings(true)}
             className="text-gray-600 hover:text-gray-900 transition-colors"
