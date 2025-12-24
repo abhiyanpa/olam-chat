@@ -24,7 +24,6 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && 
                       validateString(request.resource.data.username, 3, 20) &&
-                      validateString(request.resource.data.email, 3, 100) &&
                       request.resource.data.username.matches('^[a-zA-Z0-9_]+$');
       allow update: if isOwner(userId) ||
                       // Admins can update banned status

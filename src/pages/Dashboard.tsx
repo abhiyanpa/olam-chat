@@ -618,7 +618,7 @@ export const Dashboard = () => {
       </Helmet>
 
       {/* Sidebar */}
-      <div className={`bg-[#fafafa] border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${
+      <div className={`bg-[#fafafa] border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out overflow-hidden ${
         isMobile 
           ? `fixed inset-y-0 left-0 z-40 w-full transform ${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -780,10 +780,10 @@ export const Dashboard = () => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white relative">
+      <div className="flex-1 flex flex-col bg-white relative overflow-hidden min-w-0">
         {selectedUser ? (
           <>
-            <div className="px-4 md:px-8 py-4 md:py-5 border-b border-gray-200 flex items-center justify-between bg-white">
+            <div className="px-4 md:px-8 py-3 md:py-4 border-b border-gray-200 flex items-center justify-between bg-white flex-shrink-0">
               {isMobile && (
                 <button
                   onClick={() => setSidebarOpen(true)}
@@ -853,7 +853,8 @@ export const Dashboard = () => {
 
             <div 
               ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 bg-[#fafafa] relative"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 py-4 md:py-6 bg-[#fafafa] relative"
+              style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
             >
               {messages.map((msg, index) => {
                 const isSent = msg.sender_id === user.uid;
@@ -954,7 +955,7 @@ export const Dashboard = () => {
               )}
             </div>
 
-            <div className="px-4 md:px-8 py-4 md:py-5 border-t border-gray-200 bg-white">
+            <div className="px-4 md:px-8 py-3 md:py-4 border-t border-gray-200 bg-white flex-shrink-0">
               {/* Error Message */}
               {errorMessage && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">

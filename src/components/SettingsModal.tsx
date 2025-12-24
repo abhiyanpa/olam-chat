@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, User, Mail, Loader2, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, User, Mail, Loader2, LogOut, Check, Bell, Moon, Shield, Globe } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { updateProfile, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -19,6 +19,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState<'success' | 'error'>('success');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
       }, { merge: true });
 
       setAlertType('success');
-      setAlertMessage('Profile updated successfully!');
+      setAlertMessage('Profile updated successfully');
       setShowAlert(true);
     } catch (error: any) {
       setAlertType('error');
@@ -88,102 +91,231 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
 
   if (!isOpen) return null;
 
+  const getProviderName = () => {
+    return user?.providerData?.[0]?.providerId?.includes('google') ? 'Google' : 
+           user?.providerData?.[0]?.providerId?.includes('apple') ? 'Apple' : 'Provider';
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 rounded-lg w-full max-w-md p-8 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-        >
-          <X className="h-6 w-6" />
-        </button>
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
+        <div className="flex min-h-full items-center justify-center p-4">
+          <div className="relative bg-white rounded-lg w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">\n            
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Manage your account and preferences</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-        <h2 className="text-2xl font-bold text-white mb-6">Settings</h2>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Profile Picture
-            </label>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                {user?.photoURL ? (
-                  <img 
-                    src={user.photoURL} 
-                    alt="Profile" 
-                    className="w-20 h-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-primary-600 flex items-center justify-center text-2xl font-bold">
-                    {username[0]?.toUpperCase()}
+            {/* Content */}
+            <div className="p-6 space-y-6 overflow-y-auto overscroll-contain flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+              
+              {/* Profile Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-900">Profile</h3>
+                
+                <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="relative flex-shrink-0">
+                    {user?.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt="Profile" 
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-semibold text-white">
+                        {username[0]?.toUpperCase()}
+                      </div>
+                    )}
                   </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{username || 'User'}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{user?.email}</p>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                      <span className="text-xs text-gray-600">Connected via {getProviderName()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-900">Account Information</h3>
+                
+                <div className="space-y-4">
+                  {/* Username */}
+                  <div>
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Username
+                    </label>
+                    <input
+                      id="username"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                      required
+                      minLength={3}
+                      maxLength={20}
+                      pattern="^[a-zA-Z0-9_-]+$"
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      Only letters, numbers, underscores and hyphens. {username.length}/20
+                    </p>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Email
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={user?.email || ''}
+                      disabled
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      Email cannot be changed
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preferences */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-900">Preferences</h3>
+                
+                <div className="space-y-3">
+                  {/* Push Notifications */}
+                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                    <div className="flex items-start gap-3">
+                      <Bell className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Push Notifications</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Get notified about new messages</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        notificationsEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Email Notifications */}
+                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                    <div className="flex items-start gap-3">
+                      <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Email Notifications</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Receive updates via email</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEmailNotifications(!emailNotifications)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        emailNotifications ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          emailNotifications ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Dark Mode */}
+                  <div className="flex items-center justify-between py-3">
+                    <div className="flex items-start gap-3">
+                      <Moon className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Dark Mode</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Use dark theme (coming soon)</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border-2 border-transparent bg-gray-200 opacity-50"
+                    >
+                      <span className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="space-y-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-red-500" />
+                  <h3 className="text-sm font-medium text-red-600">Danger Zone</h3>
+                </div>
+                
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save changes'
                 )}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-400">
-                  Profile picture is from your {user?.providerData?.[0]?.providerId?.includes('google') ? 'Google' : 
-                    user?.providerData?.[0]?.providerId?.includes('apple') ? 'Apple' : 'authentication'} account
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Sign in with Google or Apple to have a profile picture
-                </p>
-              </div>
+              </button>
             </div>
           </div>
-
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
-              Username
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="pl-10 w-full rounded-lg bg-gray-800 border-2 border-gray-700 text-white focus:border-primary-500 focus:ring-primary-500 transition-colors"
-                required
-                minLength={3}
-                maxLength={20}
-                pattern="^[a-zA-Z0-9_-]+$"
-                title="Username can only contain letters, numbers, underscores, and hyphens"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input
-                type="email"
-                value={user.email}
-                disabled
-                className="pl-10 w-full rounded-lg bg-gray-800 border-2 border-gray-700 text-gray-400 cursor-not-allowed"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 px-4 rounded-lg shadow-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-          >
-            {loading && <Loader2 className="animate-spin h-5 w-5" />}
-            <span>Save Changes</span>
-          </button>
-        </form>
-
-        <button
-          onClick={handleLogout}
-          className="w-full mt-4 py-3 px-4 rounded-lg shadow-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors flex items-center justify-center space-x-2"
-        >
-          <LogOut className="h-5 w-5" />
-          <span>Logout</span>
-        </button>
+        </div>
       </div>
 
       <AlertModal
@@ -192,6 +324,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
         message={alertMessage}
         type={alertType}
       />
-    </div>
+    </>
   );
 };
