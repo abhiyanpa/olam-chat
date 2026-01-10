@@ -19,18 +19,27 @@ service cloud.firestore {
       return value is string && value.size() >= minLen && value.size() <= maxLen;
     }
     
+    function isNotBanned() {
+      return isAuthenticated() && 
+             (!exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) ||
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('banned', false) == false);
+    }
+    
     // Profiles - users can read all, write their own with validation, admins can ban users
     match /profiles/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && 
                       validateString(request.resource.data.username, 3, 20) &&
-                      request.resource.data.username.matches('^[a-zA-Z0-9_]+$');
-      allow update: if isOwner(userId) ||
-                      // Admins can update banned status
+                      request.resource.data.username.matches('^[a-zA-Z0-9_]+$') &&
+                      request.resource.data.keys().hasOnly(['username', 'email', 'avatar_url', 'online', 'last_seen', 'created_at', 'updated_at']);
+      allow update: if (isOwner(userId) && isNotBanned() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avatar_url', 'online', 'last_seen', 'updated_at'])) ||
+                      // Admins can update banned status and role
                       (isAdmin() && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['banned', 'updated_at']));
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['banned', 'updated_at', 'role']));
       allow delete: if false; // Prevent profile deletion
     }
+    
     // Usernames - for uniqueness checks with validation
     match /usernames/{username} {
       allow read: if isAuthenticated();
@@ -46,15 +55,16 @@ service cloud.firestore {
     // Private messages - only sender and receiver with validation, admins can view all
     match /private_messages/{messageId} {
       allow read: if isAdmin() || 
-                    (isAuthenticated() && 
+                    (isAuthenticated() && isNotBanned() &&
                      (resource.data.sender_id == request.auth.uid || 
                       resource.data.receiver_id == request.auth.uid));
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() && isNotBanned() &&
                       request.resource.data.sender_id == request.auth.uid &&
                       validateString(request.resource.data.content, 1, 4096) &&
                       request.resource.data.receiver_id is string &&
-                      request.resource.data.receiver_id != request.auth.uid;
-      allow update: if isAuthenticated() && 
+                      request.resource.data.receiver_id != request.auth.uid &&
+                      request.resource.data.keys().hasOnly(['sender_id', 'receiver_id', 'content', 'timestamp', 'read']);
+      allow update: if isAuthenticated() && isNotBanned() &&
                      (resource.data.sender_id == request.auth.uid ||
                       resource.data.receiver_id == request.auth.uid) &&
                      // Only allow updating read status
@@ -64,8 +74,8 @@ service cloud.firestore {
     
     // Typing status - with proper validation
     match /typing_status/{statusId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() &&
+      allow read: if isAuthenticated() && isNotBanned();
+      allow write: if isAuthenticated() && isNotBanned() &&
                      request.resource.data.userId == request.auth.uid &&
                      request.resource.data.isTyping is bool;
       allow delete: if isAuthenticated();

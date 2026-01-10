@@ -100,23 +100,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
         onClick={onClose}
       />
       
       {/* Modal */}
       <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
         <div className="flex min-h-full items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">\n            
+          <div className="relative bg-[#0e1621] rounded-lg w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">\n            
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a2332]">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Manage your account and preferences</p>
+                <h2 className="text-lg font-semibold text-white">Settings</h2>
+                <p className="text-sm text-gray-400 mt-0.5">Manage your account and preferences</p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-gray-400 hover:text-white hover:bg-[#1a2332] rounded-lg transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -127,9 +127,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
               
               {/* Profile Section */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900">Profile</h3>
+                <h3 className="text-sm font-medium text-white">Profile</h3>
                 
-                <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-start gap-4 p-4 bg-[#1a2332] rounded-lg border border-[#2a3544]">
                   <div className="relative flex-shrink-0">
                     {user?.photoURL ? (
                       <img 
@@ -138,18 +138,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
                         className="w-16 h-16 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-semibold text-white">
+                      <div className="w-16 h-16 rounded-full bg-[#8B7FFF] flex items-center justify-center text-xl font-semibold text-white">
                         {username[0]?.toUpperCase()}
                       </div>
                     )}
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{username || 'User'}</p>
-                    <p className="text-sm text-gray-500 mt-0.5">{user?.email}</p>
+                    <p className="text-sm font-medium text-white">{username || 'User'}</p>
+                    <p className="text-sm text-gray-400 mt-0.5">{user?.email}</p>
                     <div className="flex items-center gap-1.5 mt-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                      <span className="text-xs text-gray-600">Connected via {getProviderName()}</span>
+                      <span className="text-xs text-gray-400">Connected via {getProviderName()}</span>
                     </div>
                   </div>
                 </div>
@@ -157,12 +157,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
 
               {/* Account Information */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900">Account Information</h3>
+                <h3 className="text-sm font-medium text-white">Account Information</h3>
                 
                 <div className="space-y-4">
                   {/* Username */}
                   <div>
-                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1.5">
                       Username
                     </label>
                     <input
@@ -170,7 +170,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                      className="w-full px-3 py-2 bg-[#1a2332] border border-[#2a3544] text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B7FFF] focus:border-transparent transition-shadow"
                       required
                       minLength={3}
                       maxLength={20}
@@ -183,7 +183,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
 
                   {/* Email */}
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
                       Email
                     </label>
                     <input
@@ -191,7 +191,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
                       type="email"
                       value={user?.email || ''}
                       disabled
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
+                      className="w-full px-3 py-2 bg-[#0e1621] border border-[#2a3544] rounded-lg text-sm text-gray-500 cursor-not-allowed"
                     />
                     <p className="text-xs text-gray-500 mt-1.5">
                       Email cannot be changed
@@ -202,23 +202,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
 
               {/* Preferences */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900">Preferences</h3>
+                <h3 className="text-sm font-medium text-white">Preferences</h3>
                 
                 <div className="space-y-3">
                   {/* Push Notifications */}
-                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                  <div className="flex items-center justify-between py-3 border-b border-[#1a2332]">
                     <div className="flex items-start gap-3">
                       <Bell className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Push Notifications</p>
+                        <p className="text-sm font-medium text-white">Push Notifications</p>
                         <p className="text-xs text-gray-500 mt-0.5">Get notified about new messages</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                        notificationsEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#8B7FFF] focus:ring-offset-2 focus:ring-offset-[#0e1621] ${
+                        notificationsEnabled ? 'bg-[#8B7FFF]' : 'bg-[#2a3544]'
                       }`}
                     >
                       <span
@@ -230,19 +230,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
                   </div>
 
                   {/* Email Notifications */}
-                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                  <div className="flex items-center justify-between py-3 border-b border-[#1a2332]">
                     <div className="flex items-start gap-3">
                       <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Email Notifications</p>
+                        <p className="text-sm font-medium text-white">Email Notifications</p>
                         <p className="text-xs text-gray-500 mt-0.5">Receive updates via email</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setEmailNotifications(!emailNotifications)}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                        emailNotifications ? 'bg-blue-600' : 'bg-gray-200'
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#8B7FFF] focus:ring-offset-2 focus:ring-offset-[#0e1621] ${
+                        emailNotifications ? 'bg-[#8B7FFF]' : 'bg-[#2a3544]'
                       }`}
                     >
                       <span
@@ -258,14 +258,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
                     <div className="flex items-start gap-3">
                       <Moon className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Dark Mode</p>
+                        <p className="text-sm font-medium text-white">Dark Mode</p>
                         <p className="text-xs text-gray-500 mt-0.5">Use dark theme (coming soon)</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       disabled
-                      className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border-2 border-transparent bg-gray-200 opacity-50"
+                      className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border-2 border-transparent bg-[#2a3544] opacity-50"
                     >
                       <span className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0" />
                     </button>
@@ -274,15 +274,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
               </div>
 
               {/* Danger Zone */}
-              <div className="space-y-4 pt-4 border-t border-gray-200">
+              <div className="space-y-4 pt-4 border-t border-[#1a2332]">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-red-500" />
-                  <h3 className="text-sm font-medium text-red-600">Danger Zone</h3>
+                  <Shield className="h-4 w-4 text-red-400" />
+                  <h3 className="text-sm font-medium text-red-400">Danger Zone</h3>
                 </div>
                 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg hover:bg-red-500/20 hover:border-red-500/40 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign out
@@ -291,18 +291,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-[#0e1621] border-t border-[#1a2332] rounded-b-lg">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-300 bg-[#1a2332] border border-[#2a3544] rounded-lg hover:bg-[#252f3f] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#8B7FFF] rounded-lg hover:bg-[#7B6FEF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? (
                   <>

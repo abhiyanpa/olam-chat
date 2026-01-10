@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft, Reply, Check, CheckCheck, Shield } from 'lucide-react';
+import { Search, Phone, Mail, FileText, Send, Paperclip, Loader2, Settings, Menu, Volume2, VolumeX, ArrowDown, X, ArrowLeft, Reply, Check, CheckCheck, Shield, Edit } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp, writeBatch, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
@@ -116,6 +116,7 @@ export const Dashboard = () => {
   const [sending, setSending] = useState(false);
   const [soundMuted, setSoundMuted] = useState(() => soundManager.isSoundMuted());
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
@@ -603,8 +604,8 @@ export const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+      <div className="min-h-screen bg-[#0e1621] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#8B7FFF]" />
       </div>
     );
   }
@@ -612,97 +613,57 @@ export const Dashboard = () => {
   if (!user) return <Navigate to="/" replace />;
 
   return (
-    <div className="h-screen w-screen bg-white flex overflow-hidden fixed inset-0">
+    <div className="h-screen w-screen bg-[#0e1621] flex overflow-hidden fixed inset-0">
       <Helmet>
         <title>Messages - Olam Chat</title>
       </Helmet>
 
       {/* Sidebar */}
-      <div className={`bg-[#fafafa] border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out overflow-hidden ${
+      <div className={`bg-[#0e1621] border-r border-[#1a2332] flex flex-col transition-transform duration-300 ease-in-out overflow-hidden ${
         isMobile 
           ? `fixed inset-y-0 left-0 z-40 w-full transform ${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             }`
           : isTablet
-          ? `w-[280px] ${
+          ? `w-[320px] ${
               sidebarOpen ? 'block' : 'hidden'
             }`
-          : 'w-[280px]'
+          : 'w-[360px]'
       }`}>
         {/* User Header */}
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-          {isMobile && (
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="mr-2 text-gray-600 hover:text-gray-900"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
-          <div className="flex items-center gap-3">
-            <Avatar
-              avatarUrl={user.photoURL || undefined}
-              username={user.displayName || 'User'}
-              userId={user.uid}
-              size={40}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm text-black truncate">{user.displayName}</div>
-              <div className="text-xs text-green-600 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-green-600 rounded-full" />
-                Online
-              </div>
-            </div>
-          </div>
-          <button 
-            onClick={toggleSound}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-            title={soundMuted ? 'Unmute sounds' : 'Mute sounds'}
+        <div className="px-4 py-4 border-b border-[#1a2332] flex items-center justify-between">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-[#1a2332]"
           >
-            {soundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            <Menu className="w-6 h-6" />
           </button>
-          {isAdmin && (
-            <button 
-              onClick={() => navigate('/admin')}
-              className="text-purple-600 hover:text-purple-900 transition-colors"
-              title="Admin Panel"
-            >
-              <Shield className="w-5 h-5" />
-            </button>
-          )}
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-            title="Settings"
-          >
-            <Settings className="w-5 h-5" />
+          <h2 className="text-xl font-semibold text-white">Olam Chat</h2>
+          <button className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-[#1a2332]">
+            <Search className="w-6 h-6" />
           </button>
         </div>
 
         {/* Search Bar */}
-        <div className="p-4 border-b border-gray-200">
+        <div className="px-3 py-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
-              placeholder="Search users..."
+              placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-300 focus:ring-1 focus:ring-gray-300"
+              className="w-full pl-10 pr-3 py-2 bg-[#1a2332] border-0 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:bg-[#252f3f] transition-all"
             />
           </div>
         </div>
 
-        <div className="px-5 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wide">
-          {searchQuery ? 'Search Results' : 'Messages'}
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
+        {/* Conversations/Search Results List */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#2a3544] scrollbar-track-transparent">
           {searchQuery && searchResults.length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <Search className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No users found</p>
-              <p className="text-xs text-gray-400 mt-1">Try a different search term</p>
+            <div className="px-8 py-12 text-center">
+              <Search className="w-10 h-10 text-gray-600 mx-auto mb-3 opacity-50" />
+              <p className="text-sm text-gray-400">No users found</p>
             </div>
           ) : searchResults.length > 0 ? (
             searchResults.map((profile) => (
@@ -712,64 +673,73 @@ export const Dashboard = () => {
                   setSelectedUser(profile);
                   setSearchQuery('');
                   setSearchResults([]);
+                  if (isMobile) setSidebarOpen(false);
                 }}
-                className="w-full px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                className="w-full flex items-center gap-3 p-3 mx-2 my-1 rounded-lg cursor-pointer hover:bg-[#1a2332] transition-all duration-200 group"
               >
-                <Avatar
-                  avatarUrl={profile.avatar_url}
-                  username={profile.username}
-                  userId={profile.id}
-                  size={40}
-                />
+                <div className="relative flex-shrink-0">
+                  <Avatar
+                    avatarUrl={profile.avatar_url}
+                    username={profile.username}
+                    userId={profile.id}
+                    size={48}
+                  />
+                  {profile.online && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[#0e1621] rounded-full" />
+                  )}
+                </div>
                 <div className="flex-1 text-left min-w-0">
-                  <div className="font-semibold text-sm text-black mb-0.5">{profile.username}</div>
-                  <div className="text-xs text-gray-500">Click to start conversation</div>
+                  <div className="font-medium text-white text-[15px] truncate">{profile.username}</div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {profile.online ? 'online' : `last seen ${formatRelativeTime(profile.last_seen)}`}
+                  </div>
                 </div>
               </button>
             ))
           ) : conversations.length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <Mail className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No conversations yet</p>
-              <p className="text-xs text-gray-400 mt-1">Search for users to start chatting</p>
+            <div className="px-8 py-12 text-center">
+              <Mail className="w-10 h-10 text-gray-600 mx-auto mb-3 opacity-50" />
+              <p className="text-sm text-gray-400">No conversations yet</p>
+              <p className="text-xs text-gray-500 mt-1">Search for users to start chatting</p>
             </div>
           ) : (
             conversations.map((conv) => (
               <button
                 key={conv.userId}
-                onClick={() => setSelectedUser({ id: conv.userId, username: conv.username, avatar_url: conv.avatarUrl, online: conv.online, last_seen: null })}
-                className={`w-full px-5 py-3 flex items-center gap-3 transition-all duration-200 border-b border-gray-100 ${
+                onClick={() => {
+                  setSelectedUser({ id: conv.userId, username: conv.username, avatar_url: conv.avatarUrl, online: conv.online, last_seen: null });
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-3 cursor-pointer transition-all duration-150 border-b border-[#1a2332]/50 ${
                   selectedUser?.id === conv.userId 
-                    ? 'bg-blue-50 border-l-4 border-l-blue-600 shadow-sm' 
-                    : 'hover:bg-gray-50'
+                    ? 'bg-[#1a2332]' 
+                    : 'hover:bg-[#1a2332]/50 active:bg-[#1a2332]'
                 }`}
               >
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <Avatar
                     avatarUrl={conv.avatarUrl}
                     username={conv.username}
                     userId={conv.userId}
-                    size={44}
+                    size={52}
                   />
                   {conv.online && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" />
+                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0e1621] rounded-full" />
                   )}
                 </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`font-semibold text-sm truncate ${
-                      selectedUser?.id === conv.userId ? 'text-blue-600' : 'text-black'
-                    }`}>{conv.username}</span>
-                    <span className="text-xs text-gray-500 ml-2 flex-shrink-0">{formatListTime(conv.lastMessageTime)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between mb-0.5">
+                    <span className="font-medium text-white text-[15px] truncate flex-1">{conv.username}</span>
+                    <span className="text-[13px] text-gray-500 ml-2 flex-shrink-0">
+                      {formatListTime(conv.lastMessageTime)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`text-[13px] truncate ${
-                      conv.unreadCount > 0 ? 'text-gray-900 font-medium' : 'text-gray-600'
-                    }`}>{truncateMessage(conv.lastMessage)}</p>
+                    <span className="text-[14px] text-gray-400 truncate flex-1 leading-tight">{conv.lastMessage}</span>
                     {conv.unreadCount > 0 && (
-                      <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full flex items-center justify-center">
+                      <div className="ml-2 flex-shrink-0 min-w-[22px] h-[22px] px-1.5 bg-[#8B7FFF] text-white text-[12px] font-medium rounded-full flex items-center justify-center">
                         {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
-                      </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -777,17 +747,95 @@ export const Dashboard = () => {
             ))
           )}
         </div>
+        
+        {/* Floating Action Button */}
+        <button
+          onClick={() => {
+            // Focus search to start new conversation
+            const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement;
+            if (searchInput) searchInput.focus();
+          }}
+          className="absolute bottom-6 right-6 w-14 h-14 bg-[#8B7FFF] hover:bg-[#7B6FEF] text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-10"
+          title="New message"
+        >
+          <Edit className="w-6 h-6" />
+        </button>
       </div>
 
+      {/* Menu Sidebar */}
+      {menuOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            onClick={() => setMenuOpen(false)}
+          />
+          
+          {/* Menu */}
+          <div className="fixed left-0 top-0 bottom-0 w-[280px] bg-[#0e1621] z-50 border-r border-[#1a2332] shadow-xl transform transition-transform duration-300">
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="px-4 py-3 border-b border-[#1a2332] flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Menu</h3>
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#1a2332] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {/* Menu Items */}
+              <div className="flex-1 p-2">
+                <button 
+                  onClick={() => {
+                    toggleSound();
+                    setMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-300 hover:text-white hover:bg-[#1a2332] rounded-lg transition-colors"
+                >
+                  {soundMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                  <span>{soundMuted ? 'Unmute sounds' : 'Mute sounds'}</span>
+                </button>
+                
+                {isAdmin && (
+                  <button 
+                    onClick={() => {
+                      navigate('/admin');
+                      setMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-300 hover:text-white hover:bg-[#1a2332] rounded-lg transition-colors"
+                  >
+                    <Shield className="w-5 h-5" />
+                    <span>Admin Panel</span>
+                  </button>
+                )}
+                
+                <button 
+                  onClick={() => {
+                    setShowSettings(true);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-300 hover:text-white hover:bg-[#1a2332] rounded-lg transition-colors"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span>Settings</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white relative overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col bg-[#121a24] relative overflow-hidden min-w-0">
         {selectedUser ? (
           <>
-            <div className="px-4 md:px-8 py-3 md:py-4 border-b border-gray-200 flex items-center justify-between bg-white flex-shrink-0">
+            <div className="px-4 md:px-6 py-3 border-b border-[#1a2332] flex items-center justify-between bg-[#0e1621] flex-shrink-0">
               {isMobile && (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="mr-3 text-gray-600 hover:text-gray-900"
+                  className="mr-3 text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-[#1a2332]"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -798,48 +846,36 @@ export const Dashboard = () => {
                     avatarUrl={selectedUser.avatar_url}
                     username={selectedUser.username}
                     userId={selectedUser.id}
-                    size={44}
+                    size={42}
                   />
                   {selectedUser.online && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[#0e1621] rounded-full" />
                   )}
                 </div>
                 <div>
-                  <div className="font-semibold text-black text-base">{selectedUser.username}</div>
+                  <div className="font-medium text-white text-[15px]">{selectedUser.username}</div>
                   {selectedUser.online ? (
-                    <div className="text-xs text-green-600 font-medium">Online</div>
+                    <div className="text-xs text-gray-400">online</div>
                   ) : selectedUser.last_seen ? (
-                    <div className="text-xs text-gray-500">Last seen {formatRelativeTime(selectedUser.last_seen)}</div>
+                    <div className="text-xs text-gray-500">last seen {formatRelativeTime(selectedUser.last_seen)}</div>
                   ) : (
-                    <div className="text-xs text-gray-500">Offline</div>
+                    <div className="text-xs text-gray-500">offline</div>
                   )}
                 </div>
               </div>
-              <div className="flex gap-4">
-                <button className="text-gray-600 hover:text-gray-900 transition-colors" title="Call">
-                  <Phone className="w-5 h-5" />
-                </button>
-                <button className="text-gray-600 hover:text-gray-900 transition-colors" title="Video Call">
-                  <Mail className="w-5 h-5" />
-                </button>
-                <button 
-                  onClick={() => setShowSettings(true)}
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                  title="Settings"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
-              </div>
+              <button className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1a2332]" title="Search in conversation">
+                <Search className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Typing Indicator */}
             {typingUsers.length > 0 && (
-              <div className="px-4 md:px-8 py-2 bg-gray-50 border-b border-gray-200">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="px-4 md:px-6 py-2 bg-[#0e1621] border-b border-[#1a2332]">
+                <div className="flex items-center gap-2 text-sm text-gray-400">
                   <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-2 h-2 bg-[#8B7FFF] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-[#8B7FFF] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-[#8B7FFF] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                   <span>
                     {typingUsers.length === 1 
@@ -853,7 +889,7 @@ export const Dashboard = () => {
 
             <div 
               ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 py-4 md:py-6 bg-[#fafafa] relative"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 bg-[#121a24] relative scrollbar-thin scrollbar-thumb-[#2a3544] scrollbar-track-transparent"
               style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
             >
               {messages.map((msg, index) => {
@@ -882,12 +918,12 @@ export const Dashboard = () => {
                       {msg.replyTo && (
                         <div 
                           onClick={() => scrollToMessage(msg.replyTo!.messageId)}
-                          className={`mb-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors ${isSent ? 'ml-auto' : ''}`}
+                          className={`mb-1 px-3 py-2 bg-[#1a2332] rounded-lg text-xs cursor-pointer hover:bg-[#252f3f] transition-colors ${isSent ? 'ml-auto' : ''}`}
                         >
-                          <div className="font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                          <div className="font-semibold text-gray-300 mb-1">
                             {msg.replyTo.senderName}
                           </div>
-                          <div className="text-gray-500 dark:text-gray-400 truncate">
+                          <div className="text-gray-400 truncate">
                             {msg.replyTo.content.substring(0, 50)}{msg.replyTo.content.length > 50 ? '...' : ''}
                           </div>
                         </div>
@@ -898,7 +934,7 @@ export const Dashboard = () => {
                           if (el) messageRefs.current.set(msg.id, el);
                           else messageRefs.current.delete(msg.id);
                         }}
-                        className={`relative bg-[#2c2c2c] text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words transition-all hover:shadow-md ${
+                        className={`relative ${isSent ? 'bg-[#8B7FFF]' : 'bg-[#1a2332]'} text-white px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words transition-all hover:shadow-lg ${
                           isSent ? 'rounded-br-sm' : 'rounded-bl-sm'
                         }`}
                         style={{ whiteSpace: 'pre-wrap', transition: 'background-color 0.3s ease' }}
@@ -909,10 +945,10 @@ export const Dashboard = () => {
                         {!isMobile && (
                           <button
                             onClick={() => setReplyToMessage(msg)}
-                            className={`absolute -top-3 ${isSent ? '-left-8' : '-right-8'} opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-gray-200 hover:bg-gray-300 rounded-full`}
+                            className={`absolute -top-3 ${isSent ? '-left-8' : '-right-8'} opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-[#2a3544] hover:bg-[#3a4554] rounded-full`}
                             title="Reply to message"
                           >
-                            <Reply className="w-4 h-4 text-gray-700" />
+                            <Reply className="w-4 h-4 text-white" />
                           </button>
                         )}
                       </div>
@@ -922,7 +958,7 @@ export const Dashboard = () => {
                           {isSent && (
                             <span className="flex items-center">
                               {msg.status === 'read' || msg.read ? (
-                                <CheckCheck className="w-3.5 h-3.5 text-blue-600" />
+                                <CheckCheck className="w-3.5 h-3.5 text-[#8B7FFF]" />
                               ) : msg.status === 'delivered' ? (
                                 <CheckCheck className="w-3.5 h-3.5 text-gray-400" />
                               ) : (
@@ -942,7 +978,7 @@ export const Dashboard = () => {
               {showScrollButton && (
                 <button
                   onClick={handleScrollToBottom}
-                  className="fixed bottom-24 right-6 md:right-12 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 z-10"
+                  className="fixed bottom-24 right-6 md:right-12 w-12 h-12 bg-[#8B7FFF] hover:bg-[#7B6FEF] text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 z-10"
                   aria-label="Scroll to bottom"
                 >
                   <ArrowDown className="w-5 h-5" />
@@ -955,42 +991,42 @@ export const Dashboard = () => {
               )}
             </div>
 
-            <div className="px-4 md:px-8 py-3 md:py-4 border-t border-gray-200 bg-white flex-shrink-0">
+            <div className="px-4 md:px-6 py-3 border-t border-[#1a2332] bg-[#0e1621] flex-shrink-0">
               {/* Error Message */}
               {errorMessage && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <div className="mb-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+                  <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-sm text-red-800 flex-1">{errorMessage}</span>
+                  <span className="text-sm text-red-300 flex-1">{errorMessage}</span>
                 </div>
               )}
               
               {/* Reply Preview */}
               {replyToMessage && (
-                <div className="mb-3 p-3 bg-gray-100 rounded-lg flex items-start justify-between">
+                <div className="mb-3 p-3 bg-[#1a2332] border-l-4 border-l-[#8B7FFF] rounded-lg flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <Reply className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-xs font-semibold text-gray-600">
+                      <Reply className="w-4 h-4 text-[#8B7FFF] flex-shrink-0" />
+                      <span className="text-xs font-medium text-gray-400">
                         Replying to {replyToMessage.sender_id === user.uid ? 'yourself' : selectedUser?.username}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-700 truncate">
+                    <p className="text-sm text-white truncate">
                       {replyToMessage.content}
                     </p>
                   </div>
                   <button
                     onClick={() => setReplyToMessage(null)}
-                    className="ml-2 p-1 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                    className="ml-2 p-1 hover:bg-[#2a3544] rounded-full transition-colors flex-shrink-0"
                   >
-                    <X className="w-4 h-4 text-gray-500" />
+                    <X className="w-4 h-4 text-gray-400" />
                   </button>
                 </div>
               )}
               
               <form onSubmit={handleSendMessage} className="flex items-end gap-3">
-                <button type="button" className="text-gray-600 hover:text-gray-900 transition-colors mb-2">
+                <button type="button" className="text-gray-400 hover:text-white transition-colors mb-2 p-2 rounded-lg hover:bg-[#1a2332]">
                   <Paperclip className="w-5 h-5" />
                 </button>
                 <div className="flex-1 relative">
@@ -1007,16 +1043,16 @@ export const Dashboard = () => {
                         handleSendMessage(e);
                       }
                     }}
-                    placeholder="Type a message... (Shift+Enter for new line)"
-                    className="w-full px-5 py-3 border border-gray-200 rounded-[20px] text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all resize-none overflow-auto"
+                    placeholder="Type a message..."
+                    className="w-full px-4 py-3 bg-[#1a2332] border border-[#2a3544] rounded-[20px] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#8B7FFF] transition-all resize-none overflow-auto"
                     style={{ minHeight: '40px', maxHeight: '200px', lineHeight: '1.5' }}
                     disabled={sending}
                     maxLength={MAX_MESSAGE_LENGTH}
                     rows={1}
                   />
                   {newMessage.length > MAX_MESSAGE_LENGTH * 0.8 && (
-                    <span className={`absolute right-4 bottom-3 text-xs px-1 bg-white ${
-                      newMessage.length >= MAX_MESSAGE_LENGTH ? 'text-red-500 font-semibold' : 'text-gray-400'
+                    <span className={`absolute right-4 bottom-3 text-xs px-1.5 py-0.5 bg-[#0e1621] rounded ${
+                      newMessage.length >= MAX_MESSAGE_LENGTH ? 'text-red-400 font-semibold' : 'text-gray-400'
                     }`}>
                       {newMessage.length}/{MAX_MESSAGE_LENGTH}
                     </span>
@@ -1025,7 +1061,7 @@ export const Dashboard = () => {
                 <button
                   type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className={`w-11 h-11 mb-2 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 flex-shrink-0 ${
+                  className={`w-11 h-11 mb-2 bg-[#8B7FFF] text-white rounded-full flex items-center justify-center hover:bg-[#7B6FEF] disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95 flex-shrink-0 ${
                     isShaking ? 'shake' : ''
                   }`}
                   title="Send message (Enter)"
@@ -1036,21 +1072,21 @@ export const Dashboard = () => {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white">
+          <div className="flex-1 flex items-center justify-center bg-[#121a24]">
             {(isMobile || isTablet) && !sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="absolute top-4 left-4 p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
+                className="absolute top-4 left-4 p-2 bg-[#8B7FFF] text-white rounded-full shadow-lg hover:bg-[#7B6FEF] transition-all"
               >
                 <Menu className="w-6 h-6" />
               </button>
             )}
             <div className="text-center max-w-sm px-6">
-              <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Mail className="w-12 h-12 text-blue-600" />
+              <div className="w-24 h-24 bg-[#8B7FFF]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Mail className="w-12 h-12 text-[#8B7FFF]" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Welcome to Olam Chat</h3>
-              <p className="text-gray-600 mb-2">Select a conversation from the sidebar to start messaging</p>
+              <h3 className="text-2xl font-bold text-white mb-3">Welcome to Olam Chat</h3>
+              <p className="text-gray-400 mb-2">Select a conversation from the sidebar to start messaging</p>
               <p className="text-sm text-gray-500">or use the search bar to find someone new</p>
             </div>
           </div>
