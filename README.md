@@ -6,13 +6,13 @@
 
 **A modern, secure, real-time messaging platform built with React, TypeScript, and Firebase**
 
-[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://olam-chat.web.app)
+[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://olam.abhiyanpa.in)
 [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![React](https://img.shields.io/badge/React-18-blue?logo=react)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[Live Demo](https://olam-chat.web.app) • [Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started)
+[Live Demo](https://olam.abhiyanpa.in) • [Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started)
 
 </div>
 
